@@ -1,0 +1,36 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  passwordResetToken  String  @default("")
+  role      Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model Client {
+  id              Int      @id @default(autoincrement()) // Auto-increment primary key
+  contractId      String   @unique                      // Contract ID, unique, 5-character code
+  contractAddress String   @default("")                 // Contract address
+  name            String   @default("")                 // Client name
+  listCount       Int      @default(0)                 // Number of lists, default to 0
+  requestCount    Int      @default(0)                 // Number of requests, default to 0
+  memo            String   @default("")                 // Memo
+  createdAt       DateTime @default(now())             // Timestamp for creation
+  updatedAt       DateTime @updatedAt                  // Timestamp for updates
+}
