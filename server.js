@@ -9,7 +9,14 @@ const cors = require('cors');
 const app = express();
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET;
-app.use(cors());
+const corsOptions = {
+    origin: ['http://localhost:3000', 'http://27.0.234.33:3000'], // Add allowed URLs here
+    methods: ['GET', 'POST', 'PUT', 'DELETE'], // Allowed HTTP methods
+    allowedHeaders: ['Content-Type', 'Authorization'], // Allowed headers
+};
+
+app.use(cors(corsOptions));
+
 app.use(express.json());
 
 app.get('/users', async (req, res) => {
@@ -27,7 +34,6 @@ app.post('/users', async (req, res) => {
 
 app.post('/api/auth/signup', async (req, res) => {
     try {
-        console.log(req)
         const { name, email, password } = req.body;
 
         if (!name || !email || !password) {
@@ -94,12 +100,12 @@ app.post('/api/auth/signin', async (req, res) => {
         const user = await prisma.user.findUnique({ where: { email } });
         if (!user) {
             // Avoid exposing whether the email exists
-            return res.status(400).json({ message: 'Invalid credentials.' });
+            return res.status(400).json({ message: 'メールアドレスやパスワードが正しくありません。.' });
         }
 
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
-            return res.status(400).json({ message: 'Invalid credentials.' });
+            return res.status(400).json({ message: 'メールアドレスやパスワードが正しくありません。.' });
         }
 
         // Ensure JWT_SECRET is configured
@@ -119,10 +125,24 @@ app.post('/api/auth/signin', async (req, res) => {
 // Start the backend server
 app.get('/api/clients', async (req, res) => {
     try {
-        const clients = await prisma.client.findMany();
-        res.status(200).json(clients);
+        const clients = await prisma.client.findMany({
+            include: {
+                user: true, // Include related user information
+            },
+        });
+
+        const usersWithoutContracts = await prisma.user.findMany({
+            where: {
+                contractId: null, // Filter users where contractId is null
+            },
+        });
+
+        res.status(200).json({
+            clients,
+            usersWithoutContracts, // Return both in a structured object
+        });
     } catch (error) {
-        console.error(error);
+        console.error('Error fetching clients:', error);
         res.status(500).json({ message: 'Failed to fetch clients.' });
     }
 });
@@ -136,21 +156,28 @@ app.post('/api/add_client', async (req, res) => {
         return contractId;
     };
     try {
-        const { name } = req.body;
+        const { id } = req.body;
 
-        if (!name) {
-            return res.status(400).json({ message: 'Name is required.' });
+        if (!id || id == "") {
+            return res.status(400).json({ message: 'Id is required.' });
         }
-
+        const user_id = parseInt(id)
         const contractId = generateContractId();
         const newClient = await prisma.client.create({
             data: {
-                name,
                 contractId, // Save the generated contract ID
             },
         });
+        const changeUser = await prisma.user.update({
+            where: {
+                id: user_id,
+            },
+            data: {
+                contractId: contractId,
+            },
+        });
 
-        res.status(201).json(newClient);
+        res.status(201).json({ newClient, changeUser });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Failed to add client.' });
@@ -159,18 +186,26 @@ app.post('/api/add_client', async (req, res) => {
 
 app.put('/api/update_client/:id', async (req, res) => {
     try {
-        const { id, name, memo } = req.body;
+        console.log(req.body);
+        const { id, user, memo } = req.body;
 
         if (!id) {
             return res.status(400).json({ message: 'id is required.' });
         }
 
+        const updateUser = await prisma.user.update({
+            where: {
+                id: user.id,
+            },
+            data: {
+                name: user.name,
+            }
+        });
         const updatedClient = await prisma.client.update({
             where: {
                 id: id,
             },
             data: {
-                name: name,
                 memo: memo,
             },
         });
@@ -190,7 +225,6 @@ app.post('/api/auth/password-reset-request', async (req, res) => {
         if (!user) {
             return res.status(400).json({ message: 'Email not found.' });
         }
-        console.log()
         // Generate a secure token
         const resetToken = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '1h' });
 
@@ -201,7 +235,7 @@ app.post('/api/auth/password-reset-request', async (req, res) => {
         });
 
         // Create a reset link
-        const resetLink = `http://localhost:3000/auth/reset-password?token=${resetToken}`;
+        const resetLink = `http://localhost:3000/auth/resetpassword?token=${resetToken}`;
 
         // Send the email
         const transporter = nodemailer.createTransport({
@@ -260,6 +294,70 @@ app.post('/api/auth/reset-password', async (req, res) => {
         res.status(400).json({ message: 'Invalid or expired token.' });
     }
 });
+
+app.get('/api/user', async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(' ')[1]; // Extract token from Authorization header
+        if (!token) {
+            return res.status(401).json({ message: 'Authorization token required.' });
+        }
+
+        const decoded = jwt.verify(token, JWT_SECRET); // Validate and decode token
+        const userId = decoded.id;
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+        });
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        return res.status(200).json(user);
+    } catch (error) {
+        console.error('Error fetching user:', error);
+        return res.status(500).json({ message: 'Internal server error.' });
+    }
+});
+
+app.put('/api/update_user_pass', async (req, res) => {
+    try {
+        // console.log(req.body);
+        const token = req.body.headers?.Authorization?.split(' ')[1]; // Extract token from Authorization header
+        if (!token) {
+            return res.status(401).json({ message: 'Authorization token required.' });
+        }
+
+        const decoded = jwt.verify(token, JWT_SECRET); // Decode the token to get user ID
+        const userId = decoded.id;
+
+        const { changePass } = req.body; // The new password sent from the frontend
+  
+        if (!changePass || changePass.length < 8) {
+            return res.status(400).json({ message: 'Password must be at least 8 characters long.' });
+        }
+
+        // Hash the new password
+        const hashedPassword = await bcrypt.hash(changePass, 10);
+
+        // Update the user's password in the database
+        await prisma.user.update({
+            where: { id: userId },
+            data: { password: hashedPassword },
+        });
+
+        return res.status(200).json({ message: 'Password updated successfully.' });
+    } catch (error) {
+        console.error('Error updating password:', error);
+        if (error.name === 'TokenExpiredError') {
+            return res.status(401).json({ message: 'Token expired. Please log in again.' });
+        }
+        return res.status(500).json({ message: 'Failed to update password.' });
+    }
+});
+app.get("/", (req, res) => {
+    res.send("Hello");
+});
+
 // Start the server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
