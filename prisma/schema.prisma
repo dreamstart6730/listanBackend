@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -12,6 +6,7 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
 model User {
   id                 Int       @id @default(autoincrement())
   name               String
@@ -20,8 +15,9 @@ model User {
   passwordResetToken String    @default("")
   role               Int       @default(0)
   createdAt          DateTime  @default(now())
+  requests           Request[] @relation("UserRequests") // Relation with requests
 
-  // Optional Relation with Client
+  // Relation with Client (Optional)
   contractId         String?   @unique
   client             Client?   @relation(fields: [contractId], references: [contractId])
 }
@@ -32,7 +28,19 @@ model Client {
   memo            String   @default("")
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  user            User?    // Optional relation with User
+}
 
-  // No need to redefine references here; it's inferred
-  user            User?
+model Request {
+  id            Int      @id @default(autoincrement())
+  requestRandId String   @unique
+  projectName   String
+  mainCondition Json
+  subCondition  Json
+  areaSelection String
+  areaMemo      String
+  completeState Int
+  userId        Int      // Foreign key for User
+  user          User     @relation("UserRequests", fields: [userId], references: [id]) // Relation field
+  createdAt     DateTime @default(now())
 }

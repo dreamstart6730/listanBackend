@@ -10,9 +10,18 @@ const app = express();
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET;
 const corsOptions = {
-    origin: ['http://localhost:3000', 'http://27.0.234.33:3000'], // Add allowed URLs here
+    origin: ['http://localhost:3000', 'http://27.0.234.33:3000', 'http://95.217.42.233:3000'], // Add allowed URLs here
     methods: ['GET', 'POST', 'PUT', 'DELETE'], // Allowed HTTP methods
     allowedHeaders: ['Content-Type', 'Authorization'], // Allowed headers
+};
+
+const generateContractId = () => {
+    const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+    let contractId = "";
+    for (let i = 0; i < 5; i++) {
+        contractId += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return contractId;
 };
 
 app.use(cors(corsOptions));
@@ -63,32 +72,6 @@ app.post('/api/auth/signup', async (req, res) => {
 });
 
 
-// app.post('/api/auth/signin', async (req, res) => {
-//     try {
-//         const { email, password } = req.body;
-
-//         if (!email || !password) {
-//             return res.status(400).json({ message: 'Email and password are required.' });
-//         }
-
-//         const user = await prisma.user.findUnique({ where: { email } });
-//         if (!user) {
-//             return res.status(400).json({ message: 'Invalid email or password.' });
-//         }
-
-//         const isPasswordValid = await bcrypt.compare(password, user.password);
-//         if (!isPasswordValid) {
-//             return res.status(400).json({ message: 'Invalid email or password.' });
-//         }
-
-//         const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
-
-//         return res.status(200).json({ message: 'Login successful.', token,  });
-//     } catch (error) {
-//         console.error(error);
-//         return res.status(500).json({ message: 'Server error.' });
-//     }
-// });
 app.post('/api/auth/signin', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -147,14 +130,6 @@ app.get('/api/clients', async (req, res) => {
     }
 });
 app.post('/api/add_client', async (req, res) => {
-    const generateContractId = () => {
-        const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-        let contractId = "";
-        for (let i = 0; i < 5; i++) {
-            contractId += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        return contractId;
-    };
     try {
         const { id } = req.body;
 
@@ -176,8 +151,22 @@ app.post('/api/add_client', async (req, res) => {
                 contractId: contractId,
             },
         });
+        const clients = await prisma.client.findMany({
+            include: {
+                user: true, // Include related user information
+            },
+        });
 
-        res.status(201).json({ newClient, changeUser });
+        const usersWithoutContracts = await prisma.user.findMany({
+            where: {
+                contractId: null, // Filter users where contractId is null
+            },
+        });
+
+        res.status(200).json({
+            clients,
+            usersWithoutContracts, // Return both in a structured object
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Failed to add client.' });
@@ -201,7 +190,7 @@ app.put('/api/update_client/:id', async (req, res) => {
                 name: user.name,
             }
         });
-        const updatedClient = await prisma.client.update({
+        const updatedClient_data = await prisma.client.update({
             where: {
                 id: id,
             },
@@ -209,8 +198,22 @@ app.put('/api/update_client/:id', async (req, res) => {
                 memo: memo,
             },
         });
+        const clients = await prisma.client.findMany({
+            include: {
+                user: true, // Include related user information
+            },
+        });
 
-        res.status(201).json(updatedClient);
+        const usersWithoutContracts = await prisma.user.findMany({
+            where: {
+                contractId: null, // Filter users where contractId is null
+            },
+        });
+
+        res.status(200).json({
+            clients,
+            usersWithoutContracts, // Return both in a structured object
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Failed to change client.' });
@@ -331,7 +334,7 @@ app.put('/api/update_user_pass', async (req, res) => {
         const userId = decoded.id;
 
         const { changePass } = req.body; // The new password sent from the frontend
-  
+
         if (!changePass || changePass.length < 8) {
             return res.status(400).json({ message: 'Password must be at least 8 characters long.' });
         }
@@ -354,6 +357,108 @@ app.put('/api/update_user_pass', async (req, res) => {
         return res.status(500).json({ message: 'Failed to update password.' });
     }
 });
+
+app.post('/api/add_request', async (req, res) => {
+    try {
+        // Generate a unique ID for the request
+        const requestRandId = generateContractId();
+
+        // Destructure and validate required fields from the request body
+        const {
+            userId,
+            projectName,
+            mainCondition = {},  // Default to empty object if not provided
+            subCondition = {},   // Default to empty object if not provided
+            areaSelection,
+            areaMemo,
+            completeState = 0,   // Default to 0 if not provided
+        } = req.body;
+
+        // Validate required fields
+        if (!userId || !projectName || !areaSelection || !areaMemo) {
+            return res.status(400).json({ error: 'Missing required fields' });
+        }
+
+        // Insert the new request into the database
+        const newRequest = await prisma.request.create({
+            data: {
+                userId,
+                requestRandId,      // Assign the generated random ID
+                projectName,
+                mainCondition,      // Prisma accepts JSON objects directly
+                subCondition,
+                areaSelection,
+                areaMemo,
+                completeState,
+            },
+        });
+
+        // Return the newly created request
+        return res.status(201).json(newRequest);
+
+    } catch (error) {
+        console.error('Error saving request:', error);
+
+        // Handle database errors (e.g., unique constraint violation)
+        if (error.code === 'P2002' && error.meta?.target?.includes('requestRandId')) {
+            return res.status(409).json({ error: 'Duplicate requestRandId. Please try again.' });
+        }
+
+        // General server error
+        return res.status(500).json({ error: 'An error occurred while saving the request' });
+    }
+});
+
+app.get('/api/requestLists', async (req, res) => {
+    const { userId } = req.query;
+
+    if (!userId) {
+        return res.status(400).json({ error: 'Missing userId' });
+    }
+
+    try {
+        const requests = await prisma.request.findMany({
+            where: { userId: parseInt(userId, 10) },
+        });
+
+        res.status(200).json({ requests });
+    } catch (error) {
+        console.error('Error fetching requests:', error);
+        res.status(500).json({ error: 'An error occurred while fetching the requests' });
+    }
+});
+
+app.put('/api/update_request/:id', async (req, res) => {
+    const { id } = req.params;
+    const {
+        projectName,
+        mainCondition,
+        subCondition,
+        areaSelection,
+        areaMemo,
+        completeState,
+    } = req.body;
+
+    try {
+        const updatedRequest = await prisma.request.update({
+            where: { id: parseInt(id, 10) },
+            data: {
+                projectName,
+                mainCondition,
+                subCondition,
+                areaSelection,
+                areaMemo,
+                completeState,
+            },
+        });
+
+        res.status(200).json(updatedRequest);
+    } catch (error) {
+        console.error("Error updating request:", error);
+        res.status(500).json({ error: "An error occurred while updating the request" });
+    }
+});
+
 app.get("/", (req, res) => {
     res.send("Hello");
 });
