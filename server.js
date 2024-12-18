@@ -28,30 +28,17 @@ app.use(cors(corsOptions));
 
 app.use(express.json());
 
-app.get('/users', async (req, res) => {
-    const users = await prisma.user.findMany();
-    res.json(users);
-});
-
-app.post('/users', async (req, res) => {
-    const { name, email } = req.body;
-    const user = await prisma.user.create({
-        data: { name, email },
-    });
-    res.json(user);
-});
-
 app.post('/api/auth/signup', async (req, res) => {
     try {
         const { name, email, password } = req.body;
 
         if (!name || !email || !password) {
-            return res.status(400).json({ message: 'All fields are required.' });
+            return res.status(400).json({ message: 'すべてのフィールドは必須です。' });
         }
 
         const existingUser = await prisma.user.findUnique({ where: { email } });
         if (existingUser) {
-            return res.status(400).json({ message: 'Email is already registered.' });
+            return res.status(400).json({ message: 'メールがすでに登録されています。' });
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -64,7 +51,7 @@ app.post('/api/auth/signup', async (req, res) => {
             },
         });
         const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
-        return res.status(201).json({ message: 'User created successfully.', token });
+        return res.status(201).json({ message: 'ユーザーが正常に作成されました。ログインしてください。', token });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ message: 'Server error.' });
@@ -75,33 +62,25 @@ app.post('/api/auth/signup', async (req, res) => {
 app.post('/api/auth/signin', async (req, res) => {
     try {
         const { email, password } = req.body;
-
         if (!email || !password) {
-            return res.status(400).json({ message: 'Email and password are required.' });
+            return res.status(400).json({ message: 'メールとパスワードが必要です。' });
         }
-
         const user = await prisma.user.findUnique({ where: { email } });
         if (!user) {
-            // Avoid exposing whether the email exists
             return res.status(400).json({ message: 'メールアドレスやパスワードが正しくありません。.' });
         }
-
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
             return res.status(400).json({ message: 'メールアドレスやパスワードが正しくありません。.' });
         }
-
-        // Ensure JWT_SECRET is configured
         if (!JWT_SECRET) {
             throw new Error('JWT_SECRET is not configured in the environment variables.');
         }
-
         const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
-
-        return res.status(200).json({ message: 'Login successful.', token });
+        return res.status(200).json({ message: 'ログインに成功しました。', token });
     } catch (error) {
         console.error('Error during login:', error);
-        return res.status(500).json({ message: 'Internal server error.' });
+        return res.status(500).json({ message: 'サーバー エラーです。' });
     }
 });
 
@@ -137,6 +116,66 @@ app.post('/api/add_client', async (req, res) => {
             return res.status(400).json({ message: 'Id is required.' });
         }
         const user_id = parseInt(id)
+        const contractId = generateContractId();
+        const newClient = await prisma.client.create({
+            data: {
+                contractId, // Save the generated contract ID
+            },
+        });
+        const changeUser = await prisma.user.update({
+            where: {
+                id: user_id,
+            },
+            data: {
+                contractId: contractId,
+            },
+        });
+        const clients = await prisma.client.findMany({
+            include: {
+                user: true, // Include related user information
+            },
+        });
+
+        const usersWithoutContracts = await prisma.user.findMany({
+            where: {
+                contractId: null, // Filter users where contractId is null
+            },
+        });
+
+        res.status(200).json({
+            clients,
+            usersWithoutContracts, // Return both in a structured object
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to add client.' });
+    }
+});
+
+app.post('/api/make_client', async (req, res) => {
+    try {
+        const { user_name, user_email, user_pass } = req.body;
+
+        if (user_pass.length<8 || user_name == "" || user_email == "") {
+            return res.status(400).json({ message: '入力情報が正しくありません。' });
+        }
+
+        const existingUser = await prisma.user.findUnique({ where: { email: user_email } });
+        if (existingUser) {
+            return res.status(400).json({ message: 'メールがすでに登録されています。' });
+        }
+
+        const hashedPassword = await bcrypt.hash(user_pass, 10);
+
+        const user = await prisma.user.create({
+            data: {
+                name: user_name,
+                email: user_email,
+                password: hashedPassword,
+            },
+        });
+
+        const user_id = parseInt(user.id)
         const contractId = generateContractId();
         const newClient = await prisma.client.create({
             data: {
