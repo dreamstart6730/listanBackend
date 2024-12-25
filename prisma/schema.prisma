@@ -40,7 +40,11 @@ model Request {
   areaSelection String
   areaMemo      String
   completeState Int
-  userId        Int      // Foreign key for User
-  user          User     @relation("UserRequests", fields: [userId], references: [id]) // Relation field
+  userId        Int
+  user          User     @relation("UserRequests", fields: [userId], references: [id])
   createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt @default(now())
+  filePath      String?  @default("")// File path of the uploaded CSV
+  fileName      String?  @default("")// File path of the uploaded CSV
+  listCount     Int      @default(0)
 }

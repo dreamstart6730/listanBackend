@@ -1,8 +1,13 @@
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
+const { PrismaClient, Prisma } = require('@prisma/client');
+const fs = require('fs');
 const nodemailer = require("nodemailer");
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const multer = require('multer');
+const csvParser = require('csv-parser');
+const path = require('path');
+
 require('dotenv').config();
 const cors = require('cors');
 
@@ -15,6 +20,15 @@ const corsOptions = {
     allowedHeaders: ['Content-Type', 'Authorization'], // Allowed headers
 };
 
+const upload = multer({
+    dest: 'uploads/', // Destination folder for uploads
+    fileFilter: (req, file, cb) => {
+        if (path.extname(file.originalname) !== '.csv') {
+            return cb(new Error('Only .csv files are allowed'), false);
+        }
+        cb(null, true);
+    },
+});
 const generateContractId = () => {
     const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
     let contractId = "";
@@ -89,7 +103,11 @@ app.get('/api/clients', async (req, res) => {
     try {
         const clients = await prisma.client.findMany({
             include: {
-                user: true, // Include related user information
+                user: {
+                    include: {
+                        requests: true, // Fetch requests related to the user
+                    },
+                }, // Include related user information
             },
         });
 
@@ -154,9 +172,9 @@ app.post('/api/add_client', async (req, res) => {
 
 app.post('/api/make_client', async (req, res) => {
     try {
-        const { user_name, user_email, user_pass } = req.body;
+        const { user_name, user_email } = req.body;
 
-        if (user_pass.length<8 || user_name == "" || user_email == "") {
+        if (user_name == "" || user_email == "") {
             return res.status(400).json({ message: '入力情報が正しくありません。' });
         }
 
@@ -165,6 +183,7 @@ app.post('/api/make_client', async (req, res) => {
             return res.status(400).json({ message: 'メールがすでに登録されています。' });
         }
 
+        const user_pass = "listanPass";
         const hashedPassword = await bcrypt.hash(user_pass, 10);
 
         const user = await prisma.user.create({
@@ -182,12 +201,14 @@ app.post('/api/make_client', async (req, res) => {
                 contractId, // Save the generated contract ID
             },
         });
+        const changedHashPass = await bcrypt.hash(contractId, 10);
         const changeUser = await prisma.user.update({
             where: {
                 id: user_id,
             },
             data: {
                 contractId: contractId,
+                password: changedHashPass,
             },
         });
         const clients = await prisma.client.findMany({
@@ -348,6 +369,9 @@ app.get('/api/user', async (req, res) => {
         const userId = decoded.id;
         const user = await prisma.user.findUnique({
             where: { id: userId },
+            include: {
+                requests: true, // Fetch requests related to the user
+            },
         });
 
         if (!user) {
@@ -467,6 +491,38 @@ app.get('/api/requestLists', async (req, res) => {
     }
 });
 
+app.post('/api/requestLists_mana', async (req, res) => {
+    const userId = req.body.params.userId;
+
+    if (!userId) {
+        return res.status(400).json({ error: 'Missing userId' });
+    }
+
+    try {
+        const user = await prisma.request.findFirst({
+            where: { id: parseInt(userId, 10) },
+        });
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        if (user.role === 0) {
+            return res.status(301).json({ error: 'This is allowed only for a manager' });
+        }
+
+        const requests = await prisma.request.findMany({
+            include: {
+                user: true, // Include the related user data
+            },
+        });
+        res.status(200).json({ requests });
+    } catch (error) {
+        console.error('Error fetching requests:', error);
+        res.status(500).json({ error: 'An error occurred while fetching the requests' });
+    }
+});
+
 app.put('/api/update_request/:id', async (req, res) => {
     const { id } = req.params;
     const {
@@ -476,6 +532,7 @@ app.put('/api/update_request/:id', async (req, res) => {
         areaSelection,
         areaMemo,
         completeState,
+        updatedAt,
     } = req.body;
 
     try {
@@ -488,9 +545,12 @@ app.put('/api/update_request/:id', async (req, res) => {
                 areaSelection,
                 areaMemo,
                 completeState,
+                updatedAt,
+            },
+            include: {
+                user: true, // Include the related user data
             },
         });
-
         res.status(200).json(updatedRequest);
     } catch (error) {
         console.error("Error updating request:", error);
@@ -498,6 +558,121 @@ app.put('/api/update_request/:id', async (req, res) => {
     }
 });
 
+app.delete('/api/delete_request/:id', async (req, res) => {
+    const requestId = parseInt(req.params.id, 10);
+    try {
+        await prisma.request.delete({
+            where: { id: requestId },
+        });
+        res.status(200).json({ message: 'Request deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting request:', error);
+        res.status(500).json({ error: 'Failed to delete the request' });
+    }
+});
+
+app.post('/api/upload-csv', upload.single('file'), async (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const filePath = req.file.path;
+    const records = [];
+
+    try {
+        // Parse CSV
+        await new Promise((resolve, reject) => {
+            fs.createReadStream(filePath)
+                .pipe(csvParser())
+                .on('data', (data) => records.push(data))
+                .on('end', resolve)
+                .on('error', reject);
+        });
+
+        // Save records to the database
+        for (const record of records) {
+            await prisma.request.create({
+                data: {
+                    // Map CSV fields to database columns
+                    projectName: record.projectName,
+                    mainCondition: JSON.parse(record.mainCondition || '{}'),
+                    subCondition: JSON.parse(record.subCondition || '{}'),
+                    areaSelection: record.areaSelection,
+                    areaMemo: record.areaMemo,
+                    completeState: parseInt(record.completeState, 10),
+                    userId: parseInt(record.userId, 10),
+                },
+            });
+        }
+
+        res.status(201).json({ message: 'CSV data uploaded successfully' });
+    } catch (error) {
+        console.error('Error processing CSV:', error);
+        res.status(500).json({ error: 'Error processing CSV file' });
+    } finally {
+        fs.unlink(filePath, () => { }); // Remove temporary file
+    }
+});
+
+app.post('/api/upload-csv-file', upload.single('file'), async (req, res) => {
+    if (!req.file || !req.body.requestId) {
+        return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    let fileName = "";
+    try {
+        fileName = Buffer.from(req.file.originalname, 'binary').toString('utf-8');
+    } catch (error) {
+        console.warn('Error decoding file name, using as is:', error);
+    }
+
+    const filePath = req.file.path;
+    let rowCount = 0;
+
+    // Parse CSV file to count rows
+    try {
+        await new Promise((resolve, reject) => {
+            fs.createReadStream(filePath)
+                .pipe(csvParser())
+                .on('data', () => rowCount++)
+                .on('end', resolve)
+                .on('error', reject);
+        });
+
+        const updatedRequest = await prisma.request.update({
+            where: { id: parseInt(req.body.requestId, 10) },
+            data: {
+                filePath: filePath, // Save the file path
+                fileName: fileName, // Save the file name
+                listCount: rowCount-1, // Save the row count
+                completeState: 2,
+            },
+            include: {
+                user: true // Include related user information
+            },
+        });
+
+        res.status(200).json({
+            message: 'File uploaded successfully',
+            updatedRequest: updatedRequest
+        });
+    } catch (error) {
+        console.error('Error processing CSV file:', error);
+        return res.status(500).json({ error: 'Failed to process CSV file' });
+    }
+});
+
+app.get('/uploads/:filename', (req, res) => {
+    const { filename } = req.params;
+    const filePath = path.join(__dirname, 'uploads', filename);
+
+    res.download(filePath, filename, (err) => {
+        if (err) {
+            console.error("Error while sending file:", err);
+            res.status(500).send("Error while downloading the file.");
+        }
+    });
+});
 app.get("/", (req, res) => {
     res.send("Hello");
 });
