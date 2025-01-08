@@ -432,7 +432,7 @@ app.post('/api/add_request', async (req, res) => {
             projectName,
             mainCondition = {},  // Default to empty object if not provided
             subCondition = {},   // Default to empty object if not provided
-            areaSelection,
+            areaSelection = {},
             areaMemo,
             completeState = 0,   // Default to 0 if not provided
         } = req.body;
@@ -441,7 +441,10 @@ app.post('/api/add_request', async (req, res) => {
         if (!userId || !projectName || !areaSelection || !areaMemo) {
             return res.status(400).json({ error: 'Missing required fields' });
         }
-
+        let requestAt = null;
+        if(completeState == 1) {
+            requestAt = new Date();
+        }
         // Insert the new request into the database
         const newRequest = await prisma.request.create({
             data: {
@@ -453,6 +456,7 @@ app.post('/api/add_request', async (req, res) => {
                 areaSelection,
                 areaMemo,
                 completeState,
+                requestAt,
             },
         });
 
@@ -491,15 +495,34 @@ app.get('/api/requestLists', async (req, res) => {
     }
 });
 
-app.post('/api/requestLists_mana', async (req, res) => {
-    const userId = req.body.params.userId;
-
+app.get('/api/request_get', async (req, res) => {
+    const { userId, requestId } = req.query;
+    console.log(req.query)
+    console.log(requestId)
     if (!userId) {
         return res.status(400).json({ error: 'Missing userId' });
     }
 
     try {
-        const user = await prisma.request.findFirst({
+        const request = await prisma.request.findFirst({
+            where: { id: parseInt(requestId, 10) },
+        });
+
+        res.status(200).json({ request });
+    } catch (error) {
+        console.error('Error fetching requests:', error);
+        res.status(500).json({ error: 'An error occurred while fetching the requests' });
+    }
+});
+
+app.post('/api/requestLists_mana', async (req, res) => {
+    const userId = req.body.params.userId;
+    if (!userId) {
+        return res.status(400).json({ error: 'Missing userId' });
+    }
+
+    try {
+        const user = await prisma.user.findFirst({
             where: { id: parseInt(userId, 10) },
         });
 
@@ -512,6 +535,11 @@ app.post('/api/requestLists_mana', async (req, res) => {
         }
 
         const requests = await prisma.request.findMany({
+            where: {
+                completeState: {
+                    not: 0
+                }
+            },
             include: {
                 user: true, // Include the related user data
             },
@@ -534,7 +562,10 @@ app.put('/api/update_request/:id', async (req, res) => {
         completeState,
         updatedAt,
     } = req.body;
-
+    let requestAt = null;
+    if(completeState == 1) {
+        requestAt = new Date();
+    }
     try {
         const updatedRequest = await prisma.request.update({
             where: { id: parseInt(id, 10) },
@@ -546,6 +577,7 @@ app.put('/api/update_request/:id', async (req, res) => {
                 areaMemo,
                 completeState,
                 updatedAt,
+                requestAt,
             },
             include: {
                 user: true, // Include the related user data
@@ -638,7 +670,7 @@ app.post('/api/upload-csv-file', upload.single('file'), async (req, res) => {
                 .on('end', resolve)
                 .on('error', reject);
         });
-
+        const deliveryAt = new Date();
         const updatedRequest = await prisma.request.update({
             where: { id: parseInt(req.body.requestId, 10) },
             data: {
@@ -646,6 +678,7 @@ app.post('/api/upload-csv-file', upload.single('file'), async (req, res) => {
                 fileName: fileName, // Save the file name
                 listCount: rowCount-1, // Save the row count
                 completeState: 2,
+                deliveryAt: deliveryAt,
             },
             include: {
                 user: true // Include related user information

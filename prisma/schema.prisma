@@ -37,13 +37,15 @@ model Request {
   projectName   String
   mainCondition Json
   subCondition  Json
-  areaSelection String
+  areaSelection Json
   areaMemo      String
   completeState Int
   userId        Int
   user          User     @relation("UserRequests", fields: [userId], references: [id])
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt @default(now())
+  requestAt     DateTime? // Made optional
+  deliveryAt    DateTime?
   filePath      String?  @default("")// File path of the uploaded CSV
   fileName      String?  @default("")// File path of the uploaded CSV
   listCount     Int      @default(0)
