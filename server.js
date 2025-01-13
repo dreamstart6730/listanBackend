@@ -235,7 +235,6 @@ app.post('/api/make_client', async (req, res) => {
 
 app.put('/api/update_client/:id', async (req, res) => {
     try {
-        console.log(req.body);
         const { id, user, memo } = req.body;
 
         if (!id) {
@@ -387,7 +386,6 @@ app.get('/api/user', async (req, res) => {
 
 app.put('/api/update_user_pass', async (req, res) => {
     try {
-        // console.log(req.body);
         const token = req.body.headers?.Authorization?.split(' ')[1]; // Extract token from Authorization header
         if (!token) {
             return res.status(401).json({ message: 'Authorization token required.' });
@@ -497,8 +495,6 @@ app.get('/api/requestLists', async (req, res) => {
 
 app.get('/api/request_get', async (req, res) => {
     const { userId, requestId } = req.query;
-    console.log(req.query)
-    console.log(requestId)
     if (!userId) {
         return res.status(400).json({ error: 'Missing userId' });
     }
@@ -676,7 +672,7 @@ app.post('/api/upload-csv-file', upload.single('file'), async (req, res) => {
             data: {
                 filePath: filePath, // Save the file path
                 fileName: fileName, // Save the file name
-                listCount: rowCount-1, // Save the row count
+                listCount: rowCount, // Save the row count
                 completeState: 2,
                 deliveryAt: deliveryAt,
             },
