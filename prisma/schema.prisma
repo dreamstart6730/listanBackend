@@ -16,6 +16,7 @@ model User {
   role               Int       @default(0)
   createdAt          DateTime  @default(now())
   requests           Request[] @relation("UserRequests") // Relation with requests
+  requestsBlue       RequestBlue[] @relation("UserRequestBlues")
 
   // Relation with Client (Optional)
   contractId         String?   @unique
@@ -42,6 +43,25 @@ model Request {
   completeState Int
   userId        Int
   user          User     @relation("UserRequests", fields: [userId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt @default(now())
+  requestAt     DateTime? // Made optional
+  deliveryAt    DateTime?
+  filePath      String?  @default("")// File path of the uploaded CSV
+  fileName      String?  @default("")// File path of the uploaded CSV
+  listCount     Int      @default(0)
+}
+
+model RequestBlue {
+  id            Int      @id @default(autoincrement())
+  requestRandId String   @unique
+  projectName   String
+  detailCondition String
+  areaSelection Json
+  areaMemo      String
+  completeState Int
+  userId        Int
+  user          User     @relation("UserRequestBlues", fields: [userId], references: [id])
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt @default(now())
   requestAt     DateTime? // Made optional
