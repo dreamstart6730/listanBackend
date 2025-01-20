@@ -474,6 +474,165 @@ app.post('/api/add_request', async (req, res) => {
     }
 });
 
+app.post('/api/add_request_blue', async (req, res) => {
+    try {
+        // Generate a unique ID for the request
+        const requestRandId = generateContractId();
+
+        // Destructure and validate required fields from the request body
+        const {
+            userId,
+            projectName,
+            detailCondition = {},  // Default to empty object if not provided
+            areaSelection = {},
+            areaMemo,
+            tags = "",
+            completeState = 0,   // Default to 0 if not provided
+        } = req.body;
+
+        // Validate required fields
+        if (!userId || !projectName || !areaSelection || !areaMemo) {
+            return res.status(400).json({ error: 'Missing required fields' });
+        }
+        let requestAt = null;
+        if(completeState == 1) {
+            requestAt = new Date();
+        }
+        // Insert the new request into the database
+        const newRequestBlue = await prisma.requestBlue.create({
+            data: {
+                userId,
+                requestRandId,      // Assign the generated random ID
+                projectName,
+                detailCondition,      // Prisma accepts JSON objects directly
+                areaSelection,
+                areaMemo,
+                tags,
+                completeState,
+                requestAt,
+            },
+        });
+
+        // Return the newly created request
+        return res.status(201).json(newRequestBlue);
+
+    } catch (error) {
+        console.error('Error saving request:', error);
+
+        // Handle database errors (e.g., unique constraint violation)
+        if (error.code === 'P2002' && error.meta?.target?.includes('requestRandId')) {
+            return res.status(409).json({ error: 'Duplicate requestRandId. Please try again.' });
+        }
+
+        // General server error
+        return res.status(500).json({ error: 'An error occurred while saving the request' });
+    }
+});
+
+app.post('/api/add_request_yellow', async (req, res) => {
+    try {
+        // Generate a unique ID for the request
+        const requestRandId = generateContractId();
+
+        // Destructure and validate required fields from the request body
+        const {
+            userId,
+            projectName,
+            areaSelection = {},
+            areaMemo,
+            portalSite = "",
+            completeState = 0,   // Default to 0 if not provided
+        } = req.body;
+
+        // Validate required fields
+        if (!userId || !projectName || !areaSelection || !areaMemo) {
+            return res.status(400).json({ error: 'Missing required fields' });
+        }
+        let requestAt = null;
+        if(completeState == 1) {
+            requestAt = new Date();
+        }
+        // Insert the new request into the database
+        const newRequestYellow = await prisma.requestYellow.create({
+            data: {
+                userId,
+                requestRandId,      // Assign the generated random ID
+                projectName,
+                areaSelection,
+                areaMemo,
+                portalSite,
+                completeState,
+                requestAt,
+            },
+        });
+
+        // Return the newly created request
+        return res.status(201).json(newRequestYellow);
+
+    } catch (error) {
+        console.error('Error saving request:', error);
+
+        // Handle database errors (e.g., unique constraint violation)
+        if (error.code === 'P2002' && error.meta?.target?.includes('requestRandId')) {
+            return res.status(409).json({ error: 'Duplicate requestRandId. Please try again.' });
+        }
+
+        // General server error
+        return res.status(500).json({ error: 'An error occurred while saving the request' });
+    }
+});
+
+app.post('/api/add_request_pink', async (req, res) => {
+    try {
+        // Generate a unique ID for the request
+        const requestRandId = generateContractId();
+
+        // Destructure and validate required fields from the request body
+        const {
+            userId,
+            projectName,
+            areaSelection = {},
+            areaMemo,
+            completeState = 0,   // Default to 0 if not provided
+        } = req.body;
+
+        // Validate required fields
+        if (!userId || !projectName || !areaSelection || !areaMemo) {
+            return res.status(400).json({ error: 'Missing required fields' });
+        }
+        let requestAt = null;
+        if(completeState == 1) {
+            requestAt = new Date();
+        }
+        // Insert the new request into the database
+        const newRequestPink = await prisma.requestPink.create({
+            data: {
+                userId,
+                requestRandId,      // Assign the generated random ID
+                projectName,
+                areaSelection,
+                areaMemo,
+                completeState,
+                requestAt,
+            },
+        });
+
+        // Return the newly created request
+        return res.status(201).json(newRequestPink);
+
+    } catch (error) {
+        console.error('Error saving request:', error);
+
+        // Handle database errors (e.g., unique constraint violation)
+        if (error.code === 'P2002' && error.meta?.target?.includes('requestRandId')) {
+            return res.status(409).json({ error: 'Duplicate requestRandId. Please try again.' });
+        }
+
+        // General server error
+        return res.status(500).json({ error: 'An error occurred while saving the request' });
+    }
+});
+
 app.get('/api/requestLists', async (req, res) => {
     const { userId } = req.query;
 
@@ -485,8 +644,17 @@ app.get('/api/requestLists', async (req, res) => {
         const requests = await prisma.request.findMany({
             where: { userId: parseInt(userId, 10) },
         });
+        const requestsBlue = await prisma.requestBlue.findMany({
+            where: { userId: parseInt(userId, 10) },
+        });
+        const requestsYellow = await prisma.requestYellow.findMany({
+            where: { userId: parseInt(userId, 10) },
+        });
+        const requestsPink = await prisma.requestPink.findMany({
+            where: { userId: parseInt(userId, 10) },
+        });
 
-        res.status(200).json({ requests });
+        res.status(200).json({ requests, requestsBlue, requestsYellow, requestsPink });
     } catch (error) {
         console.error('Error fetching requests:', error);
         res.status(500).json({ error: 'An error occurred while fetching the requests' });
@@ -505,6 +673,60 @@ app.get('/api/request_get', async (req, res) => {
         });
 
         res.status(200).json({ request });
+    } catch (error) {
+        console.error('Error fetching requests:', error);
+        res.status(500).json({ error: 'An error occurred while fetching the requests' });
+    }
+});
+
+app.get('/api/request_get_pink', async (req, res) => {
+    const { userId, requestId } = req.query;
+    if (!userId) {
+        return res.status(400).json({ error: 'Missing userId' });
+    }
+
+    try {
+        const requestPink = await prisma.requestPink.findFirst({
+            where: { id: parseInt(requestId, 10) },
+        });
+
+        res.status(200).json({ requestPink });
+    } catch (error) {
+        console.error('Error fetching requests:', error);
+        res.status(500).json({ error: 'An error occurred while fetching the requests' });
+    }
+});
+
+app.get('/api/request_get_yellow', async (req, res) => {
+    const { userId, requestId } = req.query;
+    if (!userId) {
+        return res.status(400).json({ error: 'Missing userId' });
+    }
+
+    try {
+        const requestYellow = await prisma.requestYellow.findFirst({
+            where: { id: parseInt(requestId, 10) },
+        });
+
+        res.status(200).json({ requestYellow });
+    } catch (error) {
+        console.error('Error fetching requests:', error);
+        res.status(500).json({ error: 'An error occurred while fetching the requests' });
+    }
+});
+
+app.get('/api/request_get_blue', async (req, res) => {
+    const { userId, requestId } = req.query;
+    if (!userId) {
+        return res.status(400).json({ error: 'Missing userId' });
+    }
+
+    try {
+        const requestBlue = await prisma.requestBlue.findFirst({
+            where: { id: parseInt(requestId, 10) },
+        });
+
+        res.status(200).json({ requestBlue });
     } catch (error) {
         console.error('Error fetching requests:', error);
         res.status(500).json({ error: 'An error occurred while fetching the requests' });
@@ -540,7 +762,37 @@ app.post('/api/requestLists_mana', async (req, res) => {
                 user: true, // Include the related user data
             },
         });
-        res.status(200).json({ requests });
+        const requestsPink = await prisma.requestPink.findMany({
+            where: {
+                completeState: {
+                    not: 0
+                }
+            },
+            include: {
+                user: true, // Include the related user data
+            },
+        });
+        const requestsBlue = await prisma.requestBlue.findMany({
+            where: {
+                completeState: {
+                    not: 0
+                }
+            },
+            include: {
+                user: true, // Include the related user data
+            },
+        });
+        const requestsYellow = await prisma.requestYellow.findMany({
+            where: {
+                completeState: {
+                    not: 0
+                }
+            },
+            include: {
+                user: true, // Include the related user data
+            },
+        });
+        res.status(200).json({ requests, requestsBlue, requestsYellow, requestsPink });
     } catch (error) {
         console.error('Error fetching requests:', error);
         res.status(500).json({ error: 'An error occurred while fetching the requests' });
@@ -586,10 +838,160 @@ app.put('/api/update_request/:id', async (req, res) => {
     }
 });
 
+app.put('/api/update_request_pink/:id', async (req, res) => {
+    const { id } = req.params;
+    const {
+        projectName,
+        areaSelection,
+        areaMemo,
+        completeState,
+        updatedAt,
+    } = req.body;
+    let requestAt = null;
+    if(completeState == 1) {
+        requestAt = new Date();
+    }
+    try {
+        const updatedRequestPink = await prisma.requestPink.update({
+            where: { id: parseInt(id, 10) },
+            data: {
+                projectName,
+                areaSelection,
+                areaMemo,
+                completeState,
+                updatedAt,
+                requestAt,
+            },
+            include: {
+                user: true, // Include the related user data
+            },
+        });
+        res.status(200).json(updatedRequestPink);
+    } catch (error) {
+        console.error("Error updating request:", error);
+        res.status(500).json({ error: "An error occurred while updating the request" });
+    }
+});
+
+app.put('/api/update_request_yellow/:id', async (req, res) => {
+    const { id } = req.params;
+    const {
+        projectName,
+        areaSelection,
+        areaMemo,
+        completeState,
+        portalSite,
+        updatedAt,
+    } = req.body;
+    let requestAt = null;
+    if(completeState == 1) {
+        requestAt = new Date();
+    }
+    try {
+        const updatedRequestYellow = await prisma.requestYellow.update({
+            where: { id: parseInt(id, 10) },
+            data: {
+                projectName,
+                areaSelection,
+                areaMemo,
+                completeState,
+                portalSite,
+                updatedAt,
+                requestAt,
+            },
+            include: {
+                user: true, // Include the related user data
+            },
+        });
+        res.status(200).json(updatedRequestYellow);
+    } catch (error) {
+        console.error("Error updating request:", error);
+        res.status(500).json({ error: "An error occurred while updating the request" });
+    }
+});
+
+app.put('/api/update_request_blue/:id', async (req, res) => {
+    const { id } = req.params;
+    const {
+        projectName,
+        tags,
+        detailCondition,
+        areaSelection,
+        areaMemo,
+        completeState,
+        updatedAt,
+    } = req.body;
+    let requestAt = null;
+    if(completeState == 1) {
+        requestAt = new Date();
+    }
+    try {
+        const updatedRequestBlue = await prisma.requestBlue.update({
+            where: { id: parseInt(id, 10) },
+            data: {
+                projectName,
+                tags,
+                detailCondition,
+                areaSelection,
+                areaMemo,
+                completeState,
+                updatedAt,
+                requestAt,
+            },
+            include: {
+                user: true, // Include the related user data
+            },
+        });
+        res.status(200).json(updatedRequestBlue);
+    } catch (error) {
+        console.error("Error updating request:", error);
+        res.status(500).json({ error: "An error occurred while updating the request" });
+    }
+});
+
 app.delete('/api/delete_request/:id', async (req, res) => {
     const requestId = parseInt(req.params.id, 10);
     try {
         await prisma.request.delete({
+            where: { id: requestId },
+        });
+        res.status(200).json({ message: 'Request deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting request:', error);
+        res.status(500).json({ error: 'Failed to delete the request' });
+    }
+});
+
+app.delete('/api/delete_request_blue/:id', async (req, res) => {
+    const requestId = parseInt(req.params.id, 10);
+    try {
+        await prisma.requestBlue.delete({
+            where: { id: requestId },
+        });
+        res.status(200).json({ message: 'Request deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting request:', error);
+        res.status(500).json({ error: 'Failed to delete the request' });
+    }
+});
+
+app.delete('/api/delete_request_yellow/:id', async (req, res) => {
+    const requestId = parseInt(req.params.id, 10);
+    try {
+        await prisma.requestYellow.delete({
+            where: { id: requestId },
+        });
+        res.status(200).json({ message: 'Request deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting request:', error);
+        res.status(500).json({ error: 'Failed to delete the request' });
+    }
+});
+
+app.delete('/api/delete_request_pink/:id', async (req, res) => {
+    const requestId = parseInt(req.params.id, 10);
+    try {
+        await prisma.requestPink.delete({
             where: { id: requestId },
         });
         res.status(200).json({ message: 'Request deleted successfully' });
