@@ -423,24 +423,24 @@ app.post('/api/add_request', async (req, res) => {
     try {
         // Generate a unique ID for the request
         const requestRandId = generateContractId();
-
         // Destructure and validate required fields from the request body
         const {
             userId,
             projectName,
+            wishNum,
             mainCondition = {},  // Default to empty object if not provided
             subCondition = {},   // Default to empty object if not provided
             areaSelection = {},
-            areaMemo,
+            areaMemo = "",
             completeState = 0,   // Default to 0 if not provided
         } = req.body;
 
         // Validate required fields
-        if (!userId || !projectName || !areaSelection || !areaMemo) {
+        if (!userId || !projectName || !areaSelection) {
             return res.status(400).json({ error: 'Missing required fields' });
         }
         let requestAt = null;
-        if(completeState == 1) {
+        if (completeState == 1) {
             requestAt = new Date();
         }
         // Insert the new request into the database
@@ -449,6 +449,7 @@ app.post('/api/add_request', async (req, res) => {
                 userId,
                 requestRandId,      // Assign the generated random ID
                 projectName,
+                wishNum,
                 mainCondition,      // Prisma accepts JSON objects directly
                 subCondition,
                 areaSelection,
@@ -483,19 +484,20 @@ app.post('/api/add_request_blue', async (req, res) => {
         const {
             userId,
             projectName,
+            wishNum,
             detailCondition = {},  // Default to empty object if not provided
             areaSelection = {},
-            areaMemo,
-            tags = "",
+            areaMemo = "",
+            tags,
             completeState = 0,   // Default to 0 if not provided
         } = req.body;
 
         // Validate required fields
-        if (!userId || !projectName || !areaSelection || !areaMemo) {
+        if (!userId || !projectName || !areaSelection) {
             return res.status(400).json({ error: 'Missing required fields' });
         }
         let requestAt = null;
-        if(completeState == 1) {
+        if (completeState == 1) {
             requestAt = new Date();
         }
         // Insert the new request into the database
@@ -504,6 +506,7 @@ app.post('/api/add_request_blue', async (req, res) => {
                 userId,
                 requestRandId,      // Assign the generated random ID
                 projectName,
+                wishNum,
                 detailCondition,      // Prisma accepts JSON objects directly
                 areaSelection,
                 areaMemo,
@@ -538,18 +541,19 @@ app.post('/api/add_request_yellow', async (req, res) => {
         const {
             userId,
             projectName,
+            wishNum,
             areaSelection = {},
-            areaMemo,
+            areaMemo = "",
             portalSite = "",
             completeState = 0,   // Default to 0 if not provided
         } = req.body;
 
         // Validate required fields
-        if (!userId || !projectName || !areaSelection || !areaMemo) {
+        if (!userId || !projectName || !areaSelection) {
             return res.status(400).json({ error: 'Missing required fields' });
         }
         let requestAt = null;
-        if(completeState == 1) {
+        if (completeState == 1) {
             requestAt = new Date();
         }
         // Insert the new request into the database
@@ -558,6 +562,7 @@ app.post('/api/add_request_yellow', async (req, res) => {
                 userId,
                 requestRandId,      // Assign the generated random ID
                 projectName,
+                wishNum,
                 areaSelection,
                 areaMemo,
                 portalSite,
@@ -591,17 +596,18 @@ app.post('/api/add_request_pink', async (req, res) => {
         const {
             userId,
             projectName,
+            wishNum,
             areaSelection = {},
-            areaMemo,
+            areaMemo = "",
             completeState = 0,   // Default to 0 if not provided
         } = req.body;
 
         // Validate required fields
-        if (!userId || !projectName || !areaSelection || !areaMemo) {
+        if (!userId || !projectName || !areaSelection) {
             return res.status(400).json({ error: 'Missing required fields' });
         }
         let requestAt = null;
-        if(completeState == 1) {
+        if (completeState == 1) {
             requestAt = new Date();
         }
         // Insert the new request into the database
@@ -610,6 +616,7 @@ app.post('/api/add_request_pink', async (req, res) => {
                 userId,
                 requestRandId,      // Assign the generated random ID
                 projectName,
+                wishNum,
                 areaSelection,
                 areaMemo,
                 completeState,
@@ -803,6 +810,7 @@ app.put('/api/update_request/:id', async (req, res) => {
     const { id } = req.params;
     const {
         projectName,
+        wishNum,
         mainCondition,
         subCondition,
         areaSelection,
@@ -811,7 +819,7 @@ app.put('/api/update_request/:id', async (req, res) => {
         updatedAt,
     } = req.body;
     let requestAt = null;
-    if(completeState == 1) {
+    if (completeState == 1) {
         requestAt = new Date();
     }
     try {
@@ -819,6 +827,7 @@ app.put('/api/update_request/:id', async (req, res) => {
             where: { id: parseInt(id, 10) },
             data: {
                 projectName,
+                wishNum,
                 mainCondition,
                 subCondition,
                 areaSelection,
@@ -842,13 +851,14 @@ app.put('/api/update_request_pink/:id', async (req, res) => {
     const { id } = req.params;
     const {
         projectName,
+        wishNum,
         areaSelection,
         areaMemo,
         completeState,
         updatedAt,
     } = req.body;
     let requestAt = null;
-    if(completeState == 1) {
+    if (completeState == 1) {
         requestAt = new Date();
     }
     try {
@@ -856,6 +866,7 @@ app.put('/api/update_request_pink/:id', async (req, res) => {
             where: { id: parseInt(id, 10) },
             data: {
                 projectName,
+                wishNum,
                 areaSelection,
                 areaMemo,
                 completeState,
@@ -877,6 +888,7 @@ app.put('/api/update_request_yellow/:id', async (req, res) => {
     const { id } = req.params;
     const {
         projectName,
+        wishNum,
         areaSelection,
         areaMemo,
         completeState,
@@ -884,7 +896,7 @@ app.put('/api/update_request_yellow/:id', async (req, res) => {
         updatedAt,
     } = req.body;
     let requestAt = null;
-    if(completeState == 1) {
+    if (completeState == 1) {
         requestAt = new Date();
     }
     try {
@@ -892,6 +904,7 @@ app.put('/api/update_request_yellow/:id', async (req, res) => {
             where: { id: parseInt(id, 10) },
             data: {
                 projectName,
+                wishNum,
                 areaSelection,
                 areaMemo,
                 completeState,
@@ -914,6 +927,7 @@ app.put('/api/update_request_blue/:id', async (req, res) => {
     const { id } = req.params;
     const {
         projectName,
+        wishNum,
         tags,
         detailCondition,
         areaSelection,
@@ -922,7 +936,7 @@ app.put('/api/update_request_blue/:id', async (req, res) => {
         updatedAt,
     } = req.body;
     let requestAt = null;
-    if(completeState == 1) {
+    if (completeState == 1) {
         requestAt = new Date();
     }
     try {
@@ -930,6 +944,7 @@ app.put('/api/update_request_blue/:id', async (req, res) => {
             where: { id: parseInt(id, 10) },
             data: {
                 projectName,
+                wishNum,
                 tags,
                 detailCondition,
                 areaSelection,
@@ -1024,7 +1039,8 @@ app.post('/api/upload-csv', upload.single('file'), async (req, res) => {
             await prisma.request.create({
                 data: {
                     // Map CSV fields to database columns
-                    projectName: record.projectName,
+                    projectName:record.projectName,
+                    wishNum,
                     mainCondition: JSON.parse(record.mainCondition || '{}'),
                     subCondition: JSON.parse(record.subCondition || '{}'),
                     areaSelection: record.areaSelection,
@@ -1069,24 +1085,74 @@ app.post('/api/upload-csv-file', upload.single('file'), async (req, res) => {
                 .on('error', reject);
         });
         const deliveryAt = new Date();
-        const updatedRequest = await prisma.request.update({
-            where: { id: parseInt(req.body.requestId, 10) },
-            data: {
-                filePath: filePath, // Save the file path
-                fileName: fileName, // Save the file name
-                listCount: rowCount, // Save the row count
-                completeState: 2,
-                deliveryAt: deliveryAt,
-            },
-            include: {
-                user: true // Include related user information
-            },
-        });
+
+        let updatedRequest;
+        if (req.body.category === 'Green') {
+            updatedRequest = await prisma.request.update({
+                where: { id: parseInt(req.body.requestId, 10) },
+                data: {
+                    filePath: filePath, // Save the file path
+                    fileName: fileName, // Save the file name
+                    listCount: rowCount, // Save the row count
+                    completeState: 2,
+                    deliveryAt: deliveryAt,
+                },
+                include: {
+                    user: true // Include related user information
+                },
+            });
+        } else if (req.body.category === 'Pink') {
+            updatedRequest = await prisma.requestPink.update({
+                where: { id: parseInt(req.body.requestId, 10) },
+                data: {
+                    filePath: filePath, // Save the file path
+                    fileName: fileName, // Save the file name
+                    listCount: rowCount, // Save the row count
+                    completeState: 2,
+                    deliveryAt: deliveryAt,
+                },
+                include: {
+                    user: true // Include related user information
+                },
+            });
+        } else if (req.body.category === 'Blue') {
+            updatedRequest = await prisma.requestBlue.update({
+                where: { id: parseInt(req.body.requestId, 10) },
+                data: {
+                    filePath: filePath, // Save the file path
+                    fileName: fileName, // Save the file name
+                    listCount: rowCount, // Save the row count
+                    completeState: 2,
+                    deliveryAt: deliveryAt,
+                },
+                include: {
+                    user: true // Include related user information
+                },
+            });
+        } else if (req.body.category === 'Yellow') {
+            updatedRequest = await prisma.requestYellow.update({
+                where: { id: parseInt(req.body.requestId, 10) },
+                data: {
+                    filePath: filePath, // Save the file path
+                    fileName: fileName, // Save the file name
+                    listCount: rowCount, // Save the row count
+                    completeState: 2,
+                    deliveryAt: deliveryAt,
+                },
+                include: {
+                    user: true // Include related user information
+                },
+            });
+        }
+        else {
+            return res.status(400).json({ error: 'Invalid category' });
+        }
 
         res.status(200).json({
             message: 'File uploaded successfully',
             updatedRequest: updatedRequest
         });
+
     } catch (error) {
         console.error('Error processing CSV file:', error);
         return res.status(500).json({ error: 'Failed to process CSV file' });

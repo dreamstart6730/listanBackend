@@ -38,6 +38,7 @@ model Request {
   id            Int      @id @default(autoincrement())
   requestRandId String   @unique
   projectName   String
+  wishNum       Int     @default(0)
   mainCondition Json
   subCondition  Json
   areaSelection Json
@@ -58,6 +59,7 @@ model RequestBlue {
   id            Int      @id @default(autoincrement())
   requestRandId String   @unique
   projectName   String
+  wishNum       Int     @default(0)
   tags  String[]  @default([])
   detailCondition Json
   areaSelection Json
@@ -78,6 +80,7 @@ model RequestYellow {
   id            Int      @id @default(autoincrement())
   requestRandId String   @unique
   projectName   String
+  wishNum       Int     @default(0)
   portalSite    String
   areaSelection Json
   areaMemo      String
@@ -97,6 +100,7 @@ model RequestPink {
   id            Int      @id @default(autoincrement())
   requestRandId String   @unique
   projectName   String
+  wishNum       Int     @default(0)
   areaSelection Json
   areaMemo      String
   completeState Int
