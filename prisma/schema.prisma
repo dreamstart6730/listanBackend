@@ -19,7 +19,6 @@ model User {
   requestsBlue       RequestBlue[] @relation("UserRequestBlues")
   requestsYellow     RequestYellow[] @relation("UserRequestYellows")
   requestsPink       RequestPink[] @relation("UserRequestPinks")
-  requestsRed        RequestRed[] @relation("UserRequestReds")
 
   // Relation with Client (Optional)
   contractId         String?   @unique
@@ -45,7 +44,6 @@ model Request {
   areaSelection Json
   areaMemo      String
   completeState Int
-  cancelState   Int      @default(0)
   userId        Int
   user          User     @relation("UserRequests", fields: [userId], references: [id])
   createdAt     DateTime @default(now())
@@ -67,7 +65,6 @@ model RequestBlue {
   areaSelection Json
   areaMemo      String
   completeState Int
-  cancelState   Int      @default(0)
   userId        Int
   user          User     @relation("UserRequestBlues", fields: [userId], references: [id])
   createdAt     DateTime @default(now())
@@ -88,7 +85,6 @@ model RequestYellow {
   areaSelection Json
   areaMemo      String
   completeState Int
-  cancelState   Int      @default(0)
   userId        Int
   user          User     @relation("UserRequestYellows", fields: [userId], references: [id])
   createdAt     DateTime @default(now())
@@ -108,7 +104,6 @@ model RequestPink {
   areaSelection Json
   areaMemo      String
   completeState Int
-  cancelState   Int      @default(0)
   userId        Int
   user          User     @relation("UserRequestPinks", fields: [userId], references: [id])
   createdAt     DateTime @default(now())
@@ -117,26 +112,5 @@ model RequestPink {
   deliveryAt    DateTime?
   filePath      String?  @default("")// File path of the uploaded CSV
   fileName      String?  @default("")// File path of the uploaded CSV
-  listCount     Int      @default(0)
-}
-
-model RequestRed {
-  id            Int      @id @default(autoincrement())
-  requestRandId String   @unique
-  projectName   String
-  wishNum       Int     @default(0)
-  workSelection Json
-  areaSelection Json
-  areaMemo      String
-  completeState Int
-  cancelState   Int      @default(0)
-  userId        Int
-  user          User     @relation("UserRequestReds", fields: [userId], references: [id])
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt @default(now())
-  requestAt     DateTime?
-  deliveryAt    DateTime?
-  filePath      String?  @default("")
-  fileName      String?  @default("")
   listCount     Int      @default(0)
 }

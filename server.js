@@ -433,7 +433,6 @@ app.post('/api/add_request', async (req, res) => {
             areaSelection = {},
             areaMemo = "",
             completeState = 0,   // Default to 0 if not provided
-            cancelState = 0,
         } = req.body;
 
         // Validate required fields
@@ -457,7 +456,6 @@ app.post('/api/add_request', async (req, res) => {
                 areaMemo,
                 completeState,
                 requestAt,
-                cancelState,
             },
         });
 
@@ -492,7 +490,6 @@ app.post('/api/add_request_blue', async (req, res) => {
             areaMemo = "",
             tags,
             completeState = 0,   // Default to 0 if not provided
-            cancelState = 0,   // Default to 0 if not provided
         } = req.body;
 
         // Validate required fields
@@ -516,7 +513,6 @@ app.post('/api/add_request_blue', async (req, res) => {
                 tags,
                 completeState,
                 requestAt,
-                cancelState,
             },
         });
 
@@ -550,7 +546,6 @@ app.post('/api/add_request_yellow', async (req, res) => {
             areaMemo = "",
             portalSite = "",
             completeState = 0,   // Default to 0 if not provided
-            cancelState = 0,   // Default to 0 if not provided
         } = req.body;
 
         // Validate required fields
@@ -573,7 +568,6 @@ app.post('/api/add_request_yellow', async (req, res) => {
                 portalSite,
                 completeState,
                 requestAt,
-                cancelState,
             },
         });
 
@@ -606,7 +600,6 @@ app.post('/api/add_request_pink', async (req, res) => {
             areaSelection = {},
             areaMemo = "",
             completeState = 0,   // Default to 0 if not provided
-            cancelState = 0,
         } = req.body;
 
         // Validate required fields
@@ -628,69 +621,11 @@ app.post('/api/add_request_pink', async (req, res) => {
                 areaMemo,
                 completeState,
                 requestAt,
-                cancelState,
             },
         });
 
         // Return the newly created request
         return res.status(201).json(newRequestPink);
-
-    } catch (error) {
-        console.error('Error saving request:', error);
-
-        // Handle database errors (e.g., unique constraint violation)
-        if (error.code === 'P2002' && error.meta?.target?.includes('requestRandId')) {
-            return res.status(409).json({ error: 'Duplicate requestRandId. Please try again.' });
-        }
-
-        // General server error
-        return res.status(500).json({ error: 'An error occurred while saving the request' });
-    }
-});
-
-app.post('/api/add_request_red', async (req, res) => {
-    try {
-        // Generate a unique ID for the request
-        const requestRandId = generateContractId();
-
-        // Destructure and validate required fields from the request body
-        const {
-            userId,
-            projectName,
-            wishNum,
-            areaSelection = {},
-            workSelection = {},
-            areaMemo = "",
-            completeState = 0,   // Default to 0 if not provided
-            cancelState = 0,
-        } = req.body;
-
-        // Validate required fields
-        if (!userId || !projectName || !areaSelection) {
-            return res.status(400).json({ error: 'Missing required fields' });
-        }
-        let requestAt = null;
-        if (completeState == 1) {
-            requestAt = new Date();
-        }
-        // Insert the new request into the database
-        const newRequestRed = await prisma.requestRed.create({
-            data: {
-                userId,
-                requestRandId,      // Assign the generated random ID
-                projectName,
-                wishNum,
-                areaSelection,
-                workSelection,
-                areaMemo,
-                completeState,
-                requestAt,
-                cancelState,
-            },
-        });
-
-        // Return the newly created request
-        return res.status(201).json(newRequestRed);
 
     } catch (error) {
         console.error('Error saving request:', error);
@@ -725,11 +660,8 @@ app.get('/api/requestLists', async (req, res) => {
         const requestsPink = await prisma.requestPink.findMany({
             where: { userId: parseInt(userId, 10) },
         });
-        const requestsRed = await prisma.requestRed.findMany({
-            where: { userId: parseInt(userId, 10) },
-        });
 
-        res.status(200).json({ requests, requestsBlue, requestsYellow, requestsPink, requestsRed });
+        res.status(200).json({ requests, requestsBlue, requestsYellow, requestsPink });
     } catch (error) {
         console.error('Error fetching requests:', error);
         res.status(500).json({ error: 'An error occurred while fetching the requests' });
@@ -808,24 +740,6 @@ app.get('/api/request_get_blue', async (req, res) => {
     }
 });
 
-app.get('/api/request_get_red', async (req, res) => {
-    const { userId, requestId } = req.query;
-    if (!userId) {
-        return res.status(400).json({ error: 'Missing userId' });
-    }
-
-    try {
-        const requestRed = await prisma.requestRed.findFirst({
-            where: { id: parseInt(requestId, 10) },
-        });
-
-        res.status(200).json({ requestRed });
-    } catch (error) {
-        console.error('Error fetching requests:', error);
-        res.status(500).json({ error: 'An error occurred while fetching the requests' });
-    }
-});
-
 app.post('/api/requestLists_mana', async (req, res) => {
     const userId = req.body.params.userId;
     if (!userId) {
@@ -847,16 +761,9 @@ app.post('/api/requestLists_mana', async (req, res) => {
 
         const requests = await prisma.request.findMany({
             where: {
-                OR: [
-                    {
-                        completeState: {
-                            not: 0
-                        }
-                    },
-                    {
-                        cancelState: 1
-                    }
-                ]
+                completeState: {
+                    not: 0
+                }
             },
             include: {
                 user: true, // Include the related user data
@@ -864,16 +771,9 @@ app.post('/api/requestLists_mana', async (req, res) => {
         });
         const requestsPink = await prisma.requestPink.findMany({
             where: {
-                OR: [
-                    {
-                        completeState: {
-                            not: 0
-                        }
-                    },
-                    {
-                        cancelState: 1
-                    }
-                ]
+                completeState: {
+                    not: 0
+                }
             },
             include: {
                 user: true, // Include the related user data
@@ -881,16 +781,9 @@ app.post('/api/requestLists_mana', async (req, res) => {
         });
         const requestsBlue = await prisma.requestBlue.findMany({
             where: {
-                OR: [
-                    {
-                        completeState: {
-                            not: 0
-                        }
-                    },
-                    {
-                        cancelState: 1
-                    }
-                ]
+                completeState: {
+                    not: 0
+                }
             },
             include: {
                 user: true, // Include the related user data
@@ -898,39 +791,15 @@ app.post('/api/requestLists_mana', async (req, res) => {
         });
         const requestsYellow = await prisma.requestYellow.findMany({
             where: {
-                OR: [
-                    {
-                        completeState: {
-                            not: 0
-                        }
-                    },
-                    {
-                        cancelState: 1
-                    }
-                ]
+                completeState: {
+                    not: 0
+                }
             },
             include: {
                 user: true, // Include the related user data
             },
         });
-        const requestsRed = await prisma.requestRed.findMany({
-            where: {
-                OR: [
-                    {
-                        completeState: {
-                            not: 0
-                        }
-                    },
-                    {
-                        cancelState: 1
-                    }
-                ]
-            },
-            include: {
-                user: true, // Include the related user data
-            },
-        });
-        res.status(200).json({ requests, requestsBlue, requestsYellow, requestsPink, requestsRed });
+        res.status(200).json({ requests, requestsBlue, requestsYellow, requestsPink });
     } catch (error) {
         console.error('Error fetching requests:', error);
         res.status(500).json({ error: 'An error occurred while fetching the requests' });
@@ -948,7 +817,6 @@ app.put('/api/update_request/:id', async (req, res) => {
         areaMemo,
         completeState,
         updatedAt,
-        cancelState = 0,
     } = req.body;
     let requestAt = null;
     if (completeState == 1) {
@@ -967,7 +835,6 @@ app.put('/api/update_request/:id', async (req, res) => {
                 completeState,
                 updatedAt,
                 requestAt,
-                cancelState,
             },
             include: {
                 user: true, // Include the related user data
@@ -989,7 +856,6 @@ app.put('/api/update_request_pink/:id', async (req, res) => {
         areaMemo,
         completeState,
         updatedAt,
-        cancelState = 0,
     } = req.body;
     let requestAt = null;
     if (completeState == 1) {
@@ -1006,7 +872,6 @@ app.put('/api/update_request_pink/:id', async (req, res) => {
                 completeState,
                 updatedAt,
                 requestAt,
-                cancelState,
             },
             include: {
                 user: true, // Include the related user data
@@ -1029,7 +894,6 @@ app.put('/api/update_request_yellow/:id', async (req, res) => {
         completeState,
         portalSite,
         updatedAt,
-        cancelState = 0,
     } = req.body;
     let requestAt = null;
     if (completeState == 1) {
@@ -1047,7 +911,6 @@ app.put('/api/update_request_yellow/:id', async (req, res) => {
                 portalSite,
                 updatedAt,
                 requestAt,
-                cancelState,
             },
             include: {
                 user: true, // Include the related user data
@@ -1071,7 +934,6 @@ app.put('/api/update_request_blue/:id', async (req, res) => {
         areaMemo,
         completeState,
         updatedAt,
-        cancelState = 0,
     } = req.body;
     let requestAt = null;
     if (completeState == 1) {
@@ -1090,48 +952,6 @@ app.put('/api/update_request_blue/:id', async (req, res) => {
                 completeState,
                 updatedAt,
                 requestAt,
-                cancelState,
-            },
-            include: {
-                user: true, // Include the related user data
-            },
-        });
-        res.status(200).json(updatedRequestBlue);
-    } catch (error) {
-        console.error("Error updating request:", error);
-        res.status(500).json({ error: "An error occurred while updating the request" });
-    }
-});
-
-app.put('/api/update_request_red/:id', async (req, res) => {
-    const { id } = req.params;
-    const {
-        projectName,
-        wishNum,
-        workSelection,
-        areaSelection,
-        areaMemo,
-        completeState,
-        updatedAt,
-        cancelState = 0,
-    } = req.body;
-    let requestAt = null;
-    if (completeState == 1) {
-        requestAt = new Date();
-    }
-    try {
-        const updatedRequestBlue = await prisma.requestBlue.update({
-            where: { id: parseInt(id, 10) },
-            data: {
-                projectName,
-                wishNum,
-                workSelection,
-                areaSelection,
-                areaMemo,
-                completeState,
-                updatedAt,
-                requestAt,
-                cancelState,
             },
             include: {
                 user: true, // Include the related user data
@@ -1196,106 +1016,6 @@ app.delete('/api/delete_request_pink/:id', async (req, res) => {
     }
 });
 
-app.delete('/api/delete_request_red/:id', async (req, res) => {
-    const requestId = parseInt(req.params.id, 10);
-    try {
-        await prisma.requestRed.delete({
-            where: { id: requestId },
-        });
-        res.status(200).json({ message: 'Request deleted successfully' });
-    } catch (error) {
-        console.error('Error deleting request:', error);
-        res.status(500).json({ error: 'Failed to delete the request' });
-    }
-});
-
-
-app.put('/api/cancel_request', async (req, res) => {
-    const {
-        id,
-        category,
-    } = req.body;
-    const cancelState = 1;
-    const completeState = 0;
-    const requestAt = null;
-    try {
-        let updatedRequest;
-        switch (category) {
-            case 'ピンク':
-                updatedRequest = await prisma.requestPink.update({
-                    where: { id: parseInt(id, 10) },
-                    data: {
-                        cancelState,
-                        completeState,
-                        requestAt,
-                    },
-                    include: {
-                        user: true,
-                    },
-                });
-                break;
-            case 'ブルー':
-                updatedRequest = await prisma.requestBlue.update({
-                    where: { id: parseInt(id, 10) },
-                    data: {
-                        cancelState,
-                        completeState,
-                        requestAt,
-                    },
-                    include: {
-                        user: true,
-                    },
-                });
-                break;
-            case 'イエロー':
-                updatedRequest = await prisma.requestYellow.update({
-                    where: { id: parseInt(id, 10) },
-                    data: {
-                        cancelState,
-                        completeState,
-                        requestAt,
-                    },
-                    include: {
-                        user: true,
-                    },
-                });
-                break;
-            case 'グリーン':
-                updatedRequest = await prisma.request.update({
-                    where: { id: parseInt(id, 10) },
-                    data: {
-                        cancelState,
-                        completeState,
-                        requestAt,
-                    },
-                    include: {
-                        user: true,
-                    },
-                });
-                break;
-            case 'レッド':
-                updatedRequest = await prisma.requestRed.update({
-                    where: { id: parseInt(id, 10) },
-                    data: {
-                        cancelState,
-                        completeState,
-                        requestAt,
-                    },
-                    include: {
-                        user: true,
-                    },
-                });
-                break;
-            default:
-                return res.status(400).json({ error: 'Invalid category' });
-        }
-        res.status(200).json(updatedRequest);
-    } catch (error) {
-        console.error("Error updating request:", error);
-        res.status(500).json({ error: "An error occurred while updating the request" });
-    }
-});
-
 app.post('/api/upload-csv', upload.single('file'), async (req, res) => {
     if (!req.file) {
         return res.status(400).json({ error: 'No file uploaded' });
@@ -1319,7 +1039,7 @@ app.post('/api/upload-csv', upload.single('file'), async (req, res) => {
             await prisma.request.create({
                 data: {
                     // Map CSV fields to database columns
-                    projectName: record.projectName,
+                    projectName:record.projectName,
                     wishNum,
                     mainCondition: JSON.parse(record.mainCondition || '{}'),
                     subCondition: JSON.parse(record.subCondition || '{}'),
@@ -1411,20 +1131,6 @@ app.post('/api/upload-csv-file', upload.single('file'), async (req, res) => {
             });
         } else if (req.body.category === 'Yellow') {
             updatedRequest = await prisma.requestYellow.update({
-                where: { id: parseInt(req.body.requestId, 10) },
-                data: {
-                    filePath: filePath, // Save the file path
-                    fileName: fileName, // Save the file name
-                    listCount: rowCount, // Save the row count
-                    completeState: 2,
-                    deliveryAt: deliveryAt,
-                },
-                include: {
-                    user: true // Include related user information
-                },
-            });
-        } else if (req.body.category === 'Red') {
-            updatedRequest = await prisma.requestRed.update({
                 where: { id: parseInt(req.body.requestId, 10) },
                 data: {
                     filePath: filePath, // Save the file path
