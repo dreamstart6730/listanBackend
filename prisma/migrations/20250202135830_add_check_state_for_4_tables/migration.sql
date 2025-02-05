@@ -7,5 +7,5 @@ ALTER TABLE "RequestBlue" ADD COLUMN     "cancelState" INTEGER NOT NULL DEFAULT 
 -- AlterTable
 ALTER TABLE "RequestPink" ADD COLUMN     "cancelState" INTEGER NOT NULL DEFAULT 0;
 
--- AlterTable
+-- AlterTables
 ALTER TABLE "RequestYellow" ADD COLUMN     "cancelState" INTEGER NOT NULL DEFAULT 0;

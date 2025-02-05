@@ -115,8 +115,8 @@ model RequestPink {
   updatedAt     DateTime @updatedAt @default(now())
   requestAt     DateTime? // Made optional
   deliveryAt    DateTime?
-  filePath      String?  @default("")// File path of the uploaded CSV
-  fileName      String?  @default("")// File path of the uploaded CSV
+  filePath      String?  @default("")
+  fileName      String?  @default("")
   listCount     Int      @default(0)
 }
 

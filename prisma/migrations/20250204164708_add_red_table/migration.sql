@@ -24,5 +24,5 @@ CREATE TABLE "RequestRed" (
 -- CreateIndex
 CREATE UNIQUE INDEX "RequestRed_requestRandId_key" ON "RequestRed"("requestRandId");
 
--- AddForeignKey
+-- AddForeignKeys
 ALTER TABLE "RequestRed" ADD CONSTRAINT "RequestRed_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

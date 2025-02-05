@@ -1055,7 +1055,7 @@ app.put('/api/update_request_yellow/:id', async (req, res) => {
         });
         res.status(200).json(updatedRequestYellow);
     } catch (error) {
-        console.error("Error updating request:", error);
+        console.error("Error updating request:", error); // Log the error
         res.status(500).json({ error: "An error occurred while updating the request" });
     }
 });
