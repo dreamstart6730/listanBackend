@@ -140,3 +140,16 @@ model RequestRed {
   fileName      String?  @default("")
   listCount     Int      @default(0)
 }
+
+model RedStoreItem {
+  id            Int       @id @default(autoincrement())
+  company       String
+  url           String
+  category      String
+  phone         String
+  address       String
+  postNum       String
+  fax           String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt @default(now())
+}

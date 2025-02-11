@@ -6,6 +6,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const csvParser = require('csv-parser');
+const iconv = require('iconv-lite');
 const path = require('path');
 
 require('dotenv').config();
@@ -725,8 +726,49 @@ app.get('/api/requestLists', async (req, res) => {
         const requestsPink = await prisma.requestPink.findMany({
             where: { userId: parseInt(userId, 10) },
         });
-        const requestsRed = await prisma.requestRed.findMany({
-            where: { userId: parseInt(userId, 10) },
+        let requestsRed = await prisma.requestRed.findMany({
+            where: {
+                OR: [
+                    {
+                        completeState: {
+                            not: 0
+                        }
+                    },
+                    {
+                        cancelState: 1
+                    }
+                ]
+            },
+            include: {
+                user: true, // Include the related user data
+            },
+        });
+
+        const redItems = [];
+        const redStoreItems = await prisma.redStoreItem.findMany();
+
+        requestsRed.forEach((request) => {
+            let completeState = 0;
+            const tp_areaSelection = request.areaSelection;
+            const tp_workSelection = request.workSelection;
+            Object.keys(tp_areaSelection).forEach((areaKey) => {
+                tp_areaSelection[areaKey].forEach((area) => {
+                    Object.keys(tp_workSelection).forEach((categoryKey) => {
+                        tp_workSelection[categoryKey].forEach((item) => {
+                            const itemFound = redStoreItems.find(redItem => redItem.category === item && redItem.address.includes(area.trim()));
+                            if (itemFound) completeState++;
+                            redItems.push({
+                                bigCategory: categoryKey,
+                                smallCategory: item,
+                                area: area,
+                                state: itemFound ? "登録済み" : "未登録", // Use ternary for cleaner code
+                                updatedDate: new Date()
+                            });
+                        });
+                    });
+                });
+            });
+            if (completeState) request.completeState = 2;
         });
 
         res.status(200).json({ requests, requestsBlue, requestsYellow, requestsPink, requestsRed });
@@ -734,6 +776,53 @@ app.get('/api/requestLists', async (req, res) => {
         console.error('Error fetching requests:', error);
         res.status(500).json({ error: 'An error occurred while fetching the requests' });
     }
+});
+
+app.get('/api/red_file_download', async (req, res) => {
+    const { userId, list_id } = req.query;
+    if (!userId) {
+        return res.status(400).json({ error: 'Missing userId' });
+    }
+    try {
+        const requestsRed = await prisma.requestRed.findUnique({
+            where: { id: parseInt(list_id, 10) },
+            include: {
+                user: true, // Include the related user data
+            },
+        });
+
+        const redItems = [];
+        const redStoreItems = await prisma.redStoreItem.findMany();
+
+
+        const tp_areaSelection = requestsRed.areaSelection;
+        const tp_workSelection = requestsRed.workSelection;
+        Object.keys(tp_areaSelection).forEach((areaKey) => {
+            tp_areaSelection[areaKey].forEach((area) => {
+                Object.keys(tp_workSelection).forEach((categoryKey) => {
+                    tp_workSelection[categoryKey].forEach((item) => {
+                        const itemFound = redStoreItems.find(redItem => redItem.category === item && redItem.address.includes(area.trim()));
+                        if (itemFound) {
+                            redItems.push({
+                                "企業名": itemFound.company,
+                                "郵便番号": itemFound.postNum,
+                                "住所" : itemFound.address,
+                                "電話番号" : itemFound.phone,
+                                "FAX番号" : itemFound.fax,
+                                "URL" : itemFound.url,
+                                "カテゴリ" : itemFound.category,
+                            });
+                        }
+                    });
+                });
+            });
+        });
+        res.status(200).json(redItems);
+    } catch (error) {
+        console.error('Error fetching requests:', error);
+        res.status(500).json({ error: 'An error occurred while fetching the requests' });
+    }
+
 });
 
 app.get('/api/request_get', async (req, res) => {
@@ -937,6 +1026,92 @@ app.post('/api/requestLists_mana', async (req, res) => {
     }
 });
 
+app.post('/api/requestLists_red', async (req, res) => {
+    const { userId } = req.body.params;
+    const token = req.body.headers.Authorization?.split(' ')[1]; // Extract token from Authorization header
+    if (!token) {
+        return res.status(401).json({ message: 'Authorization token required.' });
+    }
+
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET); // Validate and decode token
+        if (!decoded || decoded.id !== userId) {
+            return res.status(401).json({ message: 'Invalid token.' });
+        }
+
+        const user = await prisma.user.findFirst({
+            where: { id: parseInt(userId, 10) },
+        });
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        if (user.role === 0) {
+            return res.status(301).json({ error: 'This is allowed only for a manager' });
+        }
+
+        const requestsRed = await prisma.requestRed.findMany({
+            where: {
+                OR: [
+                    {
+                        completeState: {
+                            not: 0
+                        }
+                    },
+                    {
+                        cancelState: 1
+                    }
+                ]
+            },
+            include: {
+                user: true, // Include the related user data
+            },
+        });
+
+        const combinedRequests = [
+            ...requestsRed.map(request => ({ ...request, category: 'レッド' })),
+        ];
+
+        const redItems = [];
+        const redStoreItems = await prisma.redStoreItem.findMany();
+
+        combinedRequests.forEach((request) => {
+            const tp_areaSelection = request.areaSelection;
+            const tp_workSelection = request.workSelection;
+            // let i=0;
+            Object.keys(tp_areaSelection).forEach((areaKey) => {
+                tp_areaSelection[areaKey].forEach((area) => {
+                    Object.keys(tp_workSelection).forEach((categoryKey) => {
+                        tp_workSelection[categoryKey].forEach((item) => {
+                            if (item == "IT・情報通信" && area.indexOf("東京都") > -1) {
+                                // console.log(i, redStoreItems[100].category, item);
+                                // console.log(i, redStoreItems[100].address, area);
+                                // console.log(redStoreItems[100]);
+                            }
+                            const itemFound = redStoreItems.find(redItem => redItem.category === item && redItem.address.includes(area.trim()));
+                            console.log(itemFound);
+                            redItems.push({
+                                bigCategory: categoryKey,
+                                smallCategory: item,
+                                area: area,
+                                state: itemFound ? "登録済み" : "未登録", // Use ternary for cleaner code
+                                updatedDate: new Date()
+                            });
+                        });
+                    });
+                });
+            });
+        });
+
+        res.status(200).json({ redItems });
+
+    } catch (error) {
+        console.error('Error fetching requests:', error);
+        res.status(500).json({ error: 'An error occurred while fetching the requests' });
+    }
+});
+
 app.put('/api/update_request/:id', async (req, res) => {
     const { id } = req.params;
     const {
@@ -1120,7 +1295,7 @@ app.put('/api/update_request_red/:id', async (req, res) => {
         requestAt = new Date();
     }
     try {
-        const updatedRequestBlue = await prisma.requestBlue.update({
+        const updatedRequestRed = await prisma.requestRed.update({
             where: { id: parseInt(id, 10) },
             data: {
                 projectName,
@@ -1137,7 +1312,7 @@ app.put('/api/update_request_red/:id', async (req, res) => {
                 user: true, // Include the related user data
             },
         });
-        res.status(200).json(updatedRequestBlue);
+        res.status(200).json(updatedRequestRed);
     } catch (error) {
         console.error("Error updating request:", error);
         res.status(500).json({ error: "An error occurred while updating the request" });
@@ -1464,6 +1639,115 @@ app.get('/uploads/:filename', (req, res) => {
         }
     });
 });
+
+app.post('/api/upload-red-file', upload.single('file'), async (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    let fileName = "";
+    try {
+        fileName = Buffer.from(req.file.originalname, 'binary').toString('utf-8');
+    } catch (error) {
+        console.warn('Error decoding file name, using as is:', error);
+        fileName = req.file.originalname; // Use the original name if decoding fails
+    }
+
+    const filePath = req.file.path;
+    const records = [];
+    const requiredFields = ['会社名', '出典URL', 'カテゴリ'];
+    let headerRow = [];
+    let startParsing = false;
+
+    // Parse CSV file to get rows
+    try {
+        await new Promise((resolve, reject) => {
+            fs.createReadStream(filePath)
+                .pipe(iconv.decodeStream('Shift_JIS')) // Convert from Shift-JIS to UTF-8
+                .pipe(csvParser())
+                .on('data', (row) => {
+                    if (!startParsing) {
+                        const keys = Object.values(row).map(k => k.toLowerCase().trim());
+                        if (keys.some(key => requiredFields.includes(key))) {
+                            startParsing = true;
+                            headerRow = keys;
+                        }
+                    } else {
+                        records.push(row);
+                    }
+                })
+                .on('end', () => resolve(records))
+                .on('error', reject);
+        });
+
+        let i = 0;
+        for (const record of records) {
+            let correctedRecord = {};
+            Object.entries(record).forEach(([key, value], index) => {
+                if (headerRow[index] && headerRow[index] !== "" && headerRow[index] !== undefined && headerRow[index] !== null) {
+                    correctedRecord[headerRow[index]] = value;
+                }
+            });
+            const mappedRecord = {};
+            Object.keys(correctedRecord).forEach((key) => {
+                let newKey = key;
+                if (key === "電話番号") newKey = "phone";
+                if (key === "会社名" || key === "企業名") newKey = "company";
+                if (/url/i.test(key)) newKey = "url";
+                if (key === "カテゴリ") newKey = "category";
+                if (key === "都道府県") newKey = "prefecture";
+                if (key === "市区町村") newKey = "city";
+                if (key === "住所") newKey = "address";
+                if (key === "郵便番号") newKey = "postNum";
+                if (/fax/i.test(key)) newKey = "fax";
+                if (key === "メールアドレス") newKey = "email";
+                mappedRecord[newKey] = correctedRecord[key];
+            });
+
+            const existingItem = await prisma.RedStoreItem.findFirst({
+                where: { url: mappedRecord['url'] } // Assuming 'url' is the unique column
+            });
+
+            if (existingItem) {
+                // Update existing item
+                await prisma.RedStoreItem.update({
+                    where: { id: existingItem.id },
+                    data: {
+                        company: mappedRecord['company'],
+                        category: mappedRecord['category'],
+                        phone: mappedRecord['phone'],
+                        address: `${mappedRecord['prefecture'] ?? ""} ${mappedRecord['city'] ?? ""} ${mappedRecord['address'] ?? ""}`,
+                        postNum: mappedRecord['postNum'],
+                        fax: mappedRecord['fax'],
+                    }
+                });
+            } else {
+                // Insert new item
+                await prisma.RedStoreItem.create({
+                    data: {
+                        url: mappedRecord['url'],
+                        company: mappedRecord['company'],
+                        category: mappedRecord['category'],
+                        phone: mappedRecord['phone'],
+                        address: `${mappedRecord['prefecture'] ?? ""} ${mappedRecord['city'] ?? ""} ${mappedRecord['address'] ?? ""}`,
+                        postNum: mappedRecord['postNum'],
+                        fax: mappedRecord['fax'],
+                    }
+                });
+            }
+
+            i++;
+        }
+        // console.log("total_i", i);
+        // console.log("header", headerRow);
+        res.status(200).json({ message: 'File uploaded and processed successfully' });
+
+    } catch (error) {
+        console.error('Error processing CSV file:', error);
+        return res.status(500).json({ error: 'Failed to process CSV file' });
+    }
+});
+
 app.get("/", (req, res) => {
     res.send("Hello");
 });
