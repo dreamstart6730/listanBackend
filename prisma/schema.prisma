@@ -14,6 +14,7 @@ model User {
   password           String
   passwordResetToken String    @default("")
   role               Int       @default(0)
+  planId             Int       @default(0)
   createdAt          DateTime  @default(now())
   requests           Request[] @relation("UserRequests") // Relation with requests
   requestsBlue       RequestBlue[] @relation("UserRequestBlues")
