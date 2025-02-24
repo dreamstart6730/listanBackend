@@ -728,6 +728,7 @@ app.get('/api/requestLists', async (req, res) => {
         });
         let requestsRed = await prisma.requestRed.findMany({
             where: {
+                userId: parseInt(userId, 10),
                 OR: [
                     {
                         completeState: {
