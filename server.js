@@ -670,11 +670,38 @@ app.post('/api/add_request_red', async (req, res) => {
         if (!userId || !projectName || !areaSelection) {
             return res.status(400).json({ error: 'Missing required fields' });
         }
-        let requestAt = null;
-        if (completeState == 1) {
-            requestAt = new Date();
+        const requestAt = new Date();
+
+
+        const redItems = [];
+        const redStoreItems = await prisma.redStoreItem.findMany();
+
+        const tp_areaSelection = areaSelection;
+        const tp_workSelection = workSelection;
+        // let i=0;
+        Object.keys(tp_areaSelection).forEach((areaKey) => {
+            tp_areaSelection[areaKey].forEach((area) => {
+                Object.keys(tp_workSelection).forEach((categoryKey) => {
+                    tp_workSelection[categoryKey].forEach((item) => {
+                        const itemFound = redStoreItems.find(redItem => redItem.category === item && redItem.address.includes(area.trim()));
+                        console.log(itemFound);
+                        redItems.push({
+                            bigCategory: categoryKey,
+                            smallCategory: item,
+                            area: area,
+                            state: itemFound ? "登録済み" : "未登録", // Use ternary for cleaner code
+                            updatedDate: new Date()
+                        });
+                    });
+                });
+            });
+        });
+
+        let deliveryAt = null;
+        if (redItems.length > 0) {
+            deliveryAt = new Date();
         }
-        // Insert the new request into the database
+
         const newRequestRed = await prisma.requestRed.create({
             data: {
                 userId,
@@ -686,9 +713,11 @@ app.post('/api/add_request_red', async (req, res) => {
                 areaMemo,
                 completeState,
                 requestAt,
+                deliveryAt,
                 cancelState,
             },
         });
+
 
         // Return the newly created request
         return res.status(201).json(newRequestRed);
@@ -802,18 +831,19 @@ app.get('/api/red_file_download', async (req, res) => {
             tp_areaSelection[areaKey].forEach((area) => {
                 Object.keys(tp_workSelection).forEach((categoryKey) => {
                     tp_workSelection[categoryKey].forEach((item) => {
-                        const itemFound = redStoreItems.find(redItem => redItem.category === item && redItem.address.includes(area.trim()));
-                        if (itemFound) {
-                            redItems.push({
-                                "企業名": itemFound.company,
-                                "郵便番号": itemFound.postNum,
-                                "住所" : itemFound.address,
-                                "電話番号" : itemFound.phone,
-                                "FAX番号" : itemFound.fax,
-                                "URL" : itemFound.url,
-                                "カテゴリ" : itemFound.category,
-                            });
-                        }
+                        redStoreItems.forEach((redItem) => {
+                            if (redItem.category === item && redItem.address.includes(area.trim())) {
+                                redItems.push({
+                                    "企業名": redItem.company,
+                                    "郵便番号": redItem.postNum,
+                                    "住所": redItem.address,
+                                    "電話番号": redItem.phone,
+                                    "FAX番号": redItem.fax,
+                                    "URL": redItem.url,
+                                    "カテゴリ": redItem.category,
+                                });
+                            }
+                        });
                     });
                 });
             });
