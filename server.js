@@ -102,28 +102,210 @@ app.post('/api/auth/signin', async (req, res) => {
 // Start the backend server
 app.get('/api/clients', async (req, res) => {
     try {
+        // const token = req.headers.authorization?.split(' ')[1];
+        // if (!token) {
+        //     return res.status(401).json({ message: 'Authorization token required.' });
+        // }
+
+        // const decoded = jwt.verify(token, JWT_SECRET);
+        // if (!decoded) {
+        //     return res.status(401).json({ message: 'Invalid token.' });
+        // }
+
+        // Get the first and last day of the current month
+        const now = new Date();
+        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
         const clients = await prisma.client.findMany({
             include: {
                 user: {
                     include: {
-                        requests: true, // Fetch requests related to the user
+                        requests: {
+                            where: {
+                                createdAt: {
+                                    gte: firstDay,
+                                    lte: lastDay
+                                }
+                            }
+                        },
+                        requestsBlue: {
+                            where: {
+                                createdAt: {
+                                    gte: firstDay,
+                                    lte: lastDay
+                                }
+                            }
+                        },
+                        requestsYellow: {
+                            where: {
+                                createdAt: {
+                                    gte: firstDay,
+                                    lte: lastDay
+                                }
+                            }
+                        },
+                        requestsPink: {
+                            where: {
+                                createdAt: {
+                                    gte: firstDay,
+                                    lte: lastDay
+                                }
+                            }
+                        },
+                        requestsRed: {
+                            where: {
+                                createdAt: {
+                                    gte: firstDay,
+                                    lte: lastDay
+                                }
+                            }
+                        },
+                        clientCost: true,
                     },
-                }, // Include related user information
+                },
             },
         });
 
         const usersWithoutContracts = await prisma.user.findMany({
             where: {
-                contractId: null, // Filter users where contractId is null
+                contractId: null,
             },
         });
 
         res.status(200).json({
             clients,
-            usersWithoutContracts, // Return both in a structured object
+            usersWithoutContracts,
         });
     } catch (error) {
         console.error('Error fetching clients:', error);
+        if (error.name === 'JsonWebTokenError') {
+            return res.status(401).json({ message: 'Invalid token.' });
+        }
+        if (error.name === 'TokenExpiredError') {
+            return res.status(401).json({ message: 'Token expired.' });
+        }
+        res.status(500).json({ message: 'Failed to fetch clients.' });
+    }
+});
+
+app.post('/api/clients_month', async (req, res) => {
+    try {
+        const { userId, monthTarget } = req.body;
+        if (!userId) {
+            return res.status(400).json({ message: 'userId is required.' });
+        }
+        if (!monthTarget) {
+            return res.status(400).json({ message: 'monthTarget is required.' });
+        }
+        console.log(userId, monthTarget);
+
+        const monthTargetDate = new Date(monthTarget);
+        const monthTargetYear = monthTargetDate.getFullYear();
+        const monthTargetMonth = monthTargetDate.getMonth();
+
+        const firstDay = new Date(monthTargetYear, monthTargetMonth, 1);
+        const lastDay = new Date(monthTargetYear, monthTargetMonth + 1, 0);
+
+        const requestsRed = await prisma.requestRed.findMany({
+            where: {
+                createdAt: {
+                    gte: firstDay,
+                    lte: lastDay,
+                },
+                userId: userId,
+            },
+            include: {
+                user: {
+                    include: {
+                        clientCost: true,
+                    },
+                },
+            },
+        });
+        const requestsBlue = await prisma.requestBlue.findMany({
+            where: {
+                createdAt: {
+                    gte: firstDay,
+                    lte: lastDay,
+                },
+                userId: userId,
+            },
+            include: {
+                user: {
+                    include: {
+                        clientCost: true,
+                    },
+                },
+            },
+        });
+
+        const requestsYellow = await prisma.requestYellow.findMany({
+            where: {
+                createdAt: {
+                    gte: firstDay,
+                    lte: lastDay,
+                },
+                userId: userId,
+            },
+            include: {
+                user: {
+                    include: {
+                        clientCost: true,
+                    },
+                },
+            },
+        });
+        
+        const requestsPink = await prisma.requestPink.findMany({
+            where: {
+                createdAt: {
+                    gte: firstDay,
+                    lte: lastDay,
+                },
+                userId: userId,
+            },
+            include: {
+                user: {
+                    include: {
+                        clientCost: true,
+                    },
+                },
+            },
+        });
+
+        const requestsGreen = await prisma.request.findMany({
+            where: {
+                createdAt: {
+                    gte: firstDay,
+                    lte: lastDay,
+                },
+                userId: userId,
+            },
+            include: {
+                user: {
+                    include: {
+                        clientCost: true,
+                    },
+                },
+            },
+        });
+
+        res.status(200).json({
+            requestsRed,
+            requestsBlue,
+            requestsYellow,
+            requestsPink,
+            requestsGreen,
+        });
+    } catch (error) {
+        console.error('Error fetching clients:', error);
+        if (error.name === 'JsonWebTokenError') {
+            return res.status(401).json({ message: 'Invalid token.' });
+        }
+        if (error.name === 'TokenExpiredError') {
+            return res.status(401).json({ message: 'Token expired.' });
+        }
         res.status(500).json({ message: 'Failed to fetch clients.' });
     }
 });
@@ -1776,6 +1958,70 @@ app.post('/api/upload-red-file', upload.single('file'), async (req, res) => {
     } catch (error) {
         console.error('Error processing CSV file:', error);
         return res.status(500).json({ error: 'Failed to process CSV file' });
+    }
+});
+
+app.post('/api/update_client_cost', async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(' ')[1]; // Extract token from Authorization header
+        if (!token) {
+            return res.status(401).json({ message: 'Authorization token required.' });
+        }
+
+        // Verify the token
+        const decoded = jwt.verify(token, JWT_SECRET);
+        if (!decoded) {
+            return res.status(401).json({ message: 'Invalid token.' });
+        }
+
+        // Check if the user has the required role
+        const user = await prisma.user.findUnique({
+            where: { id: decoded.id }
+        });
+
+        if (!user || user.role === 0) {
+            return res.status(403).json({ message: 'Access denied. Insufficient permissions.' });
+        }
+
+        const { userId, red_price, blue_price, yellow_price, pink_price, green_price } = req.body;
+
+        // Update the clientCost record for the user
+        const clientCost = await prisma.costClient.findUnique({
+            where: { userId }
+        });
+        if (!clientCost) {
+            await prisma.costClient.create({
+                data: {
+                    userId: userId,
+                    red_price: red_price,
+                    blue_price: blue_price,
+                    green_price: green_price,
+                    yellow_price: yellow_price,
+                    pink_price: pink_price,
+                }
+            });
+        }
+        await prisma.costClient.update({
+            where: { userId },
+            data: {
+                red_price: red_price,
+                blue_price: blue_price,
+                green_price: green_price,
+                yellow_price: yellow_price,
+                pink_price: pink_price,
+            }
+        });
+
+        res.status(200).json({ message: 'Client cost updated successfully' });
+    } catch (error) {
+        console.error('Error updating client cost:', error);
+        if (error.name === 'JsonWebTokenError') {
+            return res.status(401).json({ message: 'Invalid token.' });
+        }
+        if (error.name === 'TokenExpiredError') {
+            return res.status(401).json({ message: 'Token expired.' });
+        }
+        return res.status(500).json({ error: 'Failed to update client cost' });
     }
 });
 

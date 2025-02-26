@@ -21,6 +21,7 @@ model User {
   requestsYellow     RequestYellow[] @relation("UserRequestYellows")
   requestsPink       RequestPink[] @relation("UserRequestPinks")
   requestsRed        RequestRed[] @relation("UserRequestReds")
+  clientCost         CostClient? @relation("UserCostClient")
 
   // Relation with Client (Optional)
   contractId         String?   @unique
@@ -153,4 +154,17 @@ model RedStoreItem {
   fax           String
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt @default(now())
+}
+
+model CostClient {
+  id Int @id @default(autoincrement())
+  red_price Int
+  blue_price Int
+  green_price Int
+  yellow_price Int
+  pink_price Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt @default(now())
+  user          User     @relation("UserCostClient", fields: [userId], references: [id])
+  userId        Int @unique
 }
