@@ -113,54 +113,19 @@ app.get('/api/clients', async (req, res) => {
         // }
 
         // Get the first and last day of the current month
-        const now = new Date();
-        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        // const now = new Date();
+        // const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+        // const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
         const clients = await prisma.client.findMany({
             include: {
                 user: {
                     include: {
-                        requests: {
-                            where: {
-                                createdAt: {
-                                    gte: firstDay,
-                                    lte: lastDay
-                                }
-                            }
-                        },
-                        requestsBlue: {
-                            where: {
-                                createdAt: {
-                                    gte: firstDay,
-                                    lte: lastDay
-                                }
-                            }
-                        },
-                        requestsYellow: {
-                            where: {
-                                createdAt: {
-                                    gte: firstDay,
-                                    lte: lastDay
-                                }
-                            }
-                        },
-                        requestsPink: {
-                            where: {
-                                createdAt: {
-                                    gte: firstDay,
-                                    lte: lastDay
-                                }
-                            }
-                        },
-                        requestsRed: {
-                            where: {
-                                createdAt: {
-                                    gte: firstDay,
-                                    lte: lastDay
-                                }
-                            }
-                        },
+                        requests: true,
+                        requestsBlue: true,
+                        requestsYellow: true,
+                        requestsPink: true,
+                        requestsRed: true,
                         clientCost: true,
                     },
                 },
