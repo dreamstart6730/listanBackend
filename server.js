@@ -163,8 +163,6 @@ app.post('/api/clients_month', async (req, res) => {
         if (!monthTarget) {
             return res.status(400).json({ message: 'monthTarget is required.' });
         }
-        console.log(userId, monthTarget);
-
         const monthTargetDate = new Date(monthTarget);
         const monthTargetYear = monthTargetDate.getFullYear();
         const monthTargetMonth = monthTargetDate.getMonth();
@@ -395,6 +393,7 @@ app.put('/api/update_client/:id', async (req, res) => {
             },
             data: {
                 name: user.name,
+                planId: user.planId,
             }
         });
         const updatedClient_data = await prisma.client.update({
@@ -831,7 +830,6 @@ app.post('/api/add_request_red', async (req, res) => {
                 Object.keys(tp_workSelection).forEach((categoryKey) => {
                     tp_workSelection[categoryKey].forEach((item) => {
                         const itemFound = redStoreItems.find(redItem => redItem.category === item && redItem.address.includes(area.trim()));
-                        console.log(itemFound);
                         redItems.push({
                             bigCategory: categoryKey,
                             smallCategory: item,
@@ -925,27 +923,35 @@ app.get('/api/requestLists', async (req, res) => {
         const redStoreItems = await prisma.redStoreItem.findMany();
 
         requestsRed.forEach((request) => {
-            let completeState = 0;
+            redItems.length = 0;
             const tp_areaSelection = request.areaSelection;
             const tp_workSelection = request.workSelection;
             Object.keys(tp_areaSelection).forEach((areaKey) => {
                 tp_areaSelection[areaKey].forEach((area) => {
                     Object.keys(tp_workSelection).forEach((categoryKey) => {
                         tp_workSelection[categoryKey].forEach((item) => {
-                            const itemFound = redStoreItems.find(redItem => redItem.category === item && redItem.address.includes(area.trim()));
-                            if (itemFound) completeState++;
-                            redItems.push({
-                                bigCategory: categoryKey,
-                                smallCategory: item,
-                                area: area,
-                                state: itemFound ? "登録済み" : "未登録", // Use ternary for cleaner code
-                                updatedDate: new Date()
+                            // const itemFound = redStoreItems.find(redItem => redItem.category === item && redItem.address.includes(area.trim()));
+                            // if (itemFound) completeState++;
+                            // redItems.push({
+                            //     bigCategory: categoryKey,
+                            //     smallCategory: item,
+                            //     area: area,
+                            //     state: itemFound ? "登録済み" : "未登録", // Use ternary for cleaner code
+                            //     updatedDate: new Date()
+                            // });
+                            redStoreItems.forEach((redItem) => {
+                                if (redItem.category === item && redItem.address.includes(area.trim())) {
+                                    redItems.push(redItem);
+                                }
                             });
                         });
                     });
                 });
             });
-            if (completeState) request.completeState = 2;
+            if (redItems.length > 0) {
+                request.completeState = 2;
+                request.listCount = redItems.length;
+            }
         });
 
         res.status(200).json({ requests, requestsBlue, requestsYellow, requestsPink, requestsRed });
@@ -1262,19 +1268,13 @@ app.post('/api/requestLists_red', async (req, res) => {
                 tp_areaSelection[areaKey].forEach((area) => {
                     Object.keys(tp_workSelection).forEach((categoryKey) => {
                         tp_workSelection[categoryKey].forEach((item) => {
-                            if (item == "IT・情報通信" && area.indexOf("東京都") > -1) {
-                                // console.log(i, redStoreItems[100].category, item);
-                                // console.log(i, redStoreItems[100].address, area);
-                                // console.log(redStoreItems[100]);
-                            }
                             const itemFound = redStoreItems.find(redItem => redItem.category === item && redItem.address.includes(area.trim()));
-                            console.log(itemFound);
                             redItems.push({
                                 bigCategory: categoryKey,
                                 smallCategory: item,
                                 area: area,
                                 state: itemFound ? "登録済み" : "未登録", // Use ternary for cleaner code
-                                updatedDate: new Date()
+                                updatedDate: itemFound ? itemFound.updatedAt : request.createdAt
                             });
                         });
                     });
@@ -1916,8 +1916,6 @@ app.post('/api/upload-red-file', upload.single('file'), async (req, res) => {
 
             i++;
         }
-        // console.log("total_i", i);
-        // console.log("header", headerRow);
         res.status(200).json({ message: 'File uploaded and processed successfully' });
 
     } catch (error) {
@@ -1987,6 +1985,62 @@ app.post('/api/update_client_cost', async (req, res) => {
             return res.status(401).json({ message: 'Token expired.' });
         }
         return res.status(500).json({ error: 'Failed to update client cost' });
+    }
+});
+
+app.get('/api/client_cost', async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(' ')[1];
+        if (!token) {
+            return res.status(401).json({ message: 'Authorization token required.' });
+        }
+
+        // Verify the token and get user id
+        const decoded = jwt.verify(token, JWT_SECRET);
+        if (!decoded) {
+            return res.status(401).json({ message: 'Invalid token.' });
+        }
+
+        // Get user with their client cost data
+        const user = await prisma.user.findUnique({
+            where: { 
+                id: decoded.id 
+            },
+            include: {
+                clientCost: true // Include the related client cost data
+            }
+        });
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        // If user doesn't have client cost data yet, create default values
+        if (!user.clientCost) {
+            const defaultClientCost = await prisma.costClient.create({
+                data: {
+                    userId: user.id,
+                    red_price: 0,
+                    blue_price: 0,
+                    green_price: 0,
+                    yellow_price: 0,
+                    pink_price: 0,
+                }
+            });
+            user.clientCost = defaultClientCost;
+        }
+
+        return res.status(200).json(user);
+
+    } catch (error) {
+        console.error('Error fetching client cost:', error);
+        if (error.name === 'JsonWebTokenError') {
+            return res.status(401).json({ message: 'Invalid token.' });
+        }
+        if (error.name === 'TokenExpiredError') {
+            return res.status(401).json({ message: 'Token expired.' });
+        }
+        return res.status(500).json({ message: 'Internal server error.' });
     }
 });
 
