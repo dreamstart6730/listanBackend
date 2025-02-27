@@ -2020,11 +2020,11 @@ app.get('/api/client_cost', async (req, res) => {
             const defaultClientCost = await prisma.costClient.create({
                 data: {
                     userId: user.id,
-                    red_price: 0,
-                    blue_price: 0,
-                    green_price: 0,
-                    yellow_price: 0,
-                    pink_price: 0,
+                    red_price: -1,
+                    blue_price: -1,
+                    green_price: -1,
+                    yellow_price: -1,
+                    pink_price: -1,
                 }
             });
             user.clientCost = defaultClientCost;
