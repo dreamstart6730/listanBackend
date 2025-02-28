@@ -821,6 +821,7 @@ app.post('/api/add_request_red', async (req, res) => {
 
         const redItems = [];
         const redStoreItems = await prisma.redStoreItem.findMany();
+        const red_list_count = 0;
 
         const tp_areaSelection = areaSelection;
         const tp_workSelection = workSelection;
@@ -829,13 +830,10 @@ app.post('/api/add_request_red', async (req, res) => {
             tp_areaSelection[areaKey].forEach((area) => {
                 Object.keys(tp_workSelection).forEach((categoryKey) => {
                     tp_workSelection[categoryKey].forEach((item) => {
-                        const itemFound = redStoreItems.find(redItem => redItem.category === item && redItem.address.includes(area.trim()));
-                        redItems.push({
-                            bigCategory: categoryKey,
-                            smallCategory: item,
-                            area: area,
-                            state: itemFound ? "登録済み" : "未登録", // Use ternary for cleaner code
-                            updatedDate: new Date()
+                        redStoreItems.forEach((redItem) => {
+                            if (redItem.category === item && redItem.address.includes(area.trim())) {
+                                red_list_count++;
+                            }
                         });
                     });
                 });
@@ -843,7 +841,7 @@ app.post('/api/add_request_red', async (req, res) => {
         });
 
         let deliveryAt = null;
-        if (redItems.length > 0) {
+        if (red_list_count > 0) {
             deliveryAt = new Date();
         }
 
@@ -860,6 +858,7 @@ app.post('/api/add_request_red', async (req, res) => {
                 requestAt,
                 deliveryAt,
                 cancelState,
+                listCount: red_list_count,
             },
         });
 
